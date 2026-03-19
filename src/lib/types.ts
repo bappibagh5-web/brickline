@@ -1,8 +1,33 @@
 export type AppRole = 'borrower' | 'broker' | 'admin' | 'lender' | 'super_admin';
 
-export type ApplicationStatus = 'submitted' | 'in_review' | 'missing_items' | 'completed';
+export type LoanType = 'fix_flip' | 'dscr' | 'bridge' | 'construction';
+
+export type ApplicationStatus = 'draft' | 'submitted' | 'in_review' | 'missing_items' | 'completed';
 
 export type NoteType = 'internal' | 'borrower_visible';
+
+export type EntityType = 'individual' | 'llc';
+
+export type ExitStrategy = 'sell' | 'refinance' | 'rent';
+
+export interface IntakeData {
+  borrower_name?: string;
+  email?: string;
+  entity_type?: EntityType;
+  phone_number?: string;
+  loan_type?: LoanType;
+  property_address?: string;
+  purchase_price?: number;
+  estimated_value?: number;
+  property_type?: string;
+  loan_amount_requested?: number;
+  down_payment?: number;
+  exit_strategy?: ExitStrategy;
+  rehab_budget?: number;
+  rental_income?: number;
+  construction_timeline?: string;
+  construction_budget?: number;
+}
 
 export interface UserProfile {
   id: string;
@@ -16,7 +41,11 @@ export interface ApplicationRecord {
   id: string;
   borrower_id: string;
   broker_id: string | null;
+  loan_type: LoanType | null;
   status: ApplicationStatus;
+  progress_step: number;
+  application_data: IntakeData | null;
+  borrower_locked: boolean;
   created_by: string;
   updated_by: string | null;
   created_at: string;

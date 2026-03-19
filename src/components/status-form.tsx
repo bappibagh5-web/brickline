@@ -18,6 +18,7 @@ export function StatusForm({ applicationId, currentStatus }: StatusFormProps) {
     <form action={formAction} className="mt-3 grid gap-2 md:grid-cols-[180px_auto]">
       <input type="hidden" name="application_id" value={applicationId} />
       <select name="status" defaultValue={currentStatus} className="rounded-md border border-slate-300 px-3 py-2 text-sm">
+        <option value="draft">Draft</option>
         <option value="submitted">Submitted</option>
         <option value="in_review">In Review</option>
         <option value="missing_items">Missing Items</option>

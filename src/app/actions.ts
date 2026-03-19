@@ -20,8 +20,8 @@ function safeRole(value: string): AppRole {
 }
 
 function safeStatus(value: string): ApplicationStatus {
-  const allowed: ApplicationStatus[] = ['submitted', 'in_review', 'missing_items', 'completed'];
-  return (allowed.includes(value as ApplicationStatus) ? value : 'submitted') as ApplicationStatus;
+  const allowed: ApplicationStatus[] = ['draft', 'submitted', 'in_review', 'missing_items', 'completed'];
+  return (allowed.includes(value as ApplicationStatus) ? value : 'draft') as ApplicationStatus;
 }
 
 function safeNoteType(value: string): NoteType {
@@ -99,7 +99,10 @@ export async function createApplicationAction(_: ActionState, formData: FormData
   const payload = {
     borrower_id: borrowerId,
     broker_id: brokerIdInput || (profile.role === 'broker' ? user.id : null),
-    status: 'submitted' as ApplicationStatus,
+    status: 'draft' as ApplicationStatus,
+    progress_step: 1,
+    borrower_locked: false,
+    application_data: {},
     created_by: user.id,
     updated_by: user.id
   };
@@ -278,3 +281,4 @@ export async function routeToRoleHomeAction() {
 
   redirect(ROLE_HOME[profile.role]);
 }
+

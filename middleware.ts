@@ -8,9 +8,10 @@ type CookieWrite = {
   options?: Record<string, unknown>;
 };
 
-const protectedPrefixes = ['/dashboard', '/borrower', '/broker', '/admin', '/lender', '/super-admin'];
+const protectedPrefixes = ['/dashboard', '/applications', '/borrower', '/broker', '/admin', '/lender', '/super-admin'];
 
 const routeRoleRules: { prefix: string; allowed: AppRole[] }[] = [
+  { prefix: '/applications', allowed: ['borrower', 'broker', 'admin', 'super_admin'] },
   { prefix: '/borrower', allowed: ['borrower', 'admin', 'super_admin'] },
   { prefix: '/broker', allowed: ['broker', 'admin', 'super_admin'] },
   { prefix: '/admin', allowed: ['admin', 'super_admin'] },
@@ -85,3 +86,4 @@ export async function middleware(request: NextRequest) {
 export const config = {
   matcher: ['/((?!_next/static|_next/image|favicon.ico).*)']
 };
+

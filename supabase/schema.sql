@@ -1,4 +1,4 @@
--- Brickline RBAC schema + migration-safe setup for Supabase
+-- Brickline RBAC + Borrower Intake schema
 
 create extension if not exists "pgcrypto";
 
@@ -9,7 +9,11 @@ BEGIN
   END IF;
 
   IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'application_status') THEN
-    CREATE TYPE public.application_status AS ENUM ('submitted', 'in_review', 'missing_items', 'completed');
+    CREATE TYPE public.application_status AS ENUM ('draft', 'submitted', 'in_review', 'missing_items', 'completed');
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'loan_type') THEN
+    CREATE TYPE public.loan_type AS ENUM ('fix_flip', 'dscr', 'bridge', 'construction');
   END IF;
 
   IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'note_type') THEN
@@ -21,6 +25,17 @@ BEGIN
   END IF;
 END
 $$;
+
+alter type public.application_status add value if not exists 'draft';
+alter type public.application_status add value if not exists 'submitted';
+alter type public.application_status add value if not exists 'in_review';
+alter type public.application_status add value if not exists 'missing_items';
+alter type public.application_status add value if not exists 'completed';
+
+alter type public.loan_type add value if not exists 'fix_flip';
+alter type public.loan_type add value if not exists 'dscr';
+alter type public.loan_type add value if not exists 'bridge';
+alter type public.loan_type add value if not exists 'construction';
 
 create table if not exists public.user_profiles (
   id uuid primary key references auth.users(id) on delete cascade,
@@ -36,7 +51,11 @@ create table if not exists public.applications (
   id uuid primary key default gen_random_uuid(),
   borrower_id uuid not null references auth.users(id) on delete cascade,
   broker_id uuid references auth.users(id) on delete set null,
-  status public.application_status not null default 'submitted',
+  loan_type public.loan_type,
+  status public.application_status not null default 'draft',
+  progress_step integer not null default 1,
+  application_data jsonb not null default '{}'::jsonb,
+  borrower_locked boolean not null default false,
   created_by uuid not null references auth.users(id),
   updated_by uuid references auth.users(id),
   created_at timestamptz not null default now(),
@@ -61,6 +80,46 @@ BEGIN
     EXECUTE 'ALTER TABLE public.applications ADD COLUMN broker_id uuid references auth.users(id) on delete set null';
   END IF;
 
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='applications' AND column_name='loan_type') THEN
+    EXECUTE 'ALTER TABLE public.applications ADD COLUMN loan_type public.loan_type';
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='applications' AND column_name='status') THEN
+    EXECUTE 'ALTER TABLE public.applications ADD COLUMN status public.application_status not null default ''draft''';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema='public' AND table_name='applications' AND column_name='status' AND udt_name='text'
+  ) THEN
+    EXECUTE 'ALTER TABLE public.applications ALTER COLUMN status DROP DEFAULT';
+    EXECUTE $cmd$
+      ALTER TABLE public.applications
+      ALTER COLUMN status TYPE public.application_status
+      USING (
+        CASE
+          WHEN status::text in ('approved') THEN 'completed'::public.application_status
+          WHEN status::text in ('declined') THEN 'missing_items'::public.application_status
+          WHEN status::text in ('submitted','in_review','missing_items','completed','draft') THEN status::text::public.application_status
+          ELSE 'draft'::public.application_status
+        END
+      )
+    $cmd$;
+    EXECUTE 'ALTER TABLE public.applications ALTER COLUMN status SET DEFAULT ''draft''::public.application_status';
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='applications' AND column_name='progress_step') THEN
+    EXECUTE 'ALTER TABLE public.applications ADD COLUMN progress_step integer not null default 1';
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='applications' AND column_name='application_data') THEN
+    EXECUTE 'ALTER TABLE public.applications ADD COLUMN application_data jsonb not null default ''{}''::jsonb';
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='applications' AND column_name='borrower_locked') THEN
+    EXECUTE 'ALTER TABLE public.applications ADD COLUMN borrower_locked boolean not null default false';
+  END IF;
+
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='applications' AND column_name='created_by') THEN
     EXECUTE 'ALTER TABLE public.applications ADD COLUMN created_by uuid references auth.users(id)';
     EXECUTE 'UPDATE public.applications SET created_by = borrower_id WHERE created_by IS NULL';
@@ -76,39 +135,7 @@ BEGIN
     EXECUTE 'ALTER TABLE public.applications ADD COLUMN updated_at timestamptz not null default now()';
   END IF;
 
-  FOR c IN
-    SELECT conname
-    FROM pg_constraint
-    WHERE conrelid = 'public.applications'::regclass
-      AND contype = 'c'
-      AND pg_get_constraintdef(oid) ILIKE '%status%'
-  LOOP
-    EXECUTE format('ALTER TABLE public.applications DROP CONSTRAINT IF EXISTS %I', c.conname);
-  END LOOP;
-
-  IF EXISTS (
-    SELECT 1 FROM information_schema.columns
-    WHERE table_schema='public' AND table_name='applications' AND column_name='status' AND udt_name='text'
-  ) THEN
-    EXECUTE 'ALTER TABLE public.applications ALTER COLUMN status DROP DEFAULT';
-    EXECUTE $cmd$
-      ALTER TABLE public.applications
-      ALTER COLUMN status TYPE public.application_status
-      USING (
-        CASE
-          WHEN status::text = 'approved' THEN 'completed'::public.application_status
-          WHEN status::text = 'declined' THEN 'missing_items'::public.application_status
-          WHEN status::text = 'submitted' THEN 'submitted'::public.application_status
-          WHEN status::text = 'in_review' THEN 'in_review'::public.application_status
-          WHEN status::text = 'missing_items' THEN 'missing_items'::public.application_status
-          WHEN status::text = 'completed' THEN 'completed'::public.application_status
-          ELSE 'submitted'::public.application_status
-        END
-      )
-    $cmd$;
-    EXECUTE 'ALTER TABLE public.applications ALTER COLUMN status SET DEFAULT ''submitted''::public.application_status';
-  END IF;
-
+  -- Cleanup columns from old intake prototype if present
   IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='applications' AND column_name='full_name') THEN
     EXECUTE 'ALTER TABLE public.applications DROP COLUMN full_name';
   END IF;
@@ -141,8 +168,6 @@ create table if not exists public.application_lenders (
   created_at timestamptz not null default now(),
   unique (application_id, lender_id)
 );
-
-create index if not exists application_lenders_lender_id_idx on public.application_lenders (lender_id);
 
 create table if not exists public.documents (
   id uuid primary key default gen_random_uuid(),
@@ -214,8 +239,6 @@ create table if not exists public.notes (
   created_at timestamptz not null default now()
 );
 
-create index if not exists notes_application_id_idx on public.notes (application_id);
-
 create table if not exists public.audit_logs (
   id uuid primary key default gen_random_uuid(),
   entity_type public.audit_entity not null,
@@ -225,8 +248,6 @@ create table if not exists public.audit_logs (
   details jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now()
 );
-
-create index if not exists audit_logs_entity_idx on public.audit_logs (entity_type, entity_id, created_at desc);
 
 create or replace function public.current_user_role()
 returns public.app_role
@@ -248,16 +269,6 @@ as $$
   select coalesce(public.current_user_role() in ('admin', 'super_admin'), false);
 $$;
 
-create or replace function public.is_super_admin()
-returns boolean
-language sql
-stable
-security definer
-set search_path = public
-as $$
-  select coalesce(public.current_user_role() = 'super_admin', false);
-$$;
-
 create or replace function public.app_accessible(app_id uuid)
 returns boolean
 language sql
@@ -272,13 +283,11 @@ as $$
       and (
         a.borrower_id = auth.uid()
         or a.broker_id = auth.uid()
-        or exists (
-          select 1
-          from public.application_lenders al
-          where al.application_id = a.id
-            and al.lender_id = auth.uid()
-        )
         or public.is_adminish()
+        or exists (
+          select 1 from public.application_lenders al
+          where al.application_id = a.id and al.lender_id = auth.uid()
+        )
       )
   );
 $$;
@@ -314,7 +323,6 @@ declare
   v_entity public.audit_entity;
   v_entity_id uuid;
   v_action text;
-  v_details jsonb;
 begin
   v_entity := case tg_table_name
     when 'applications' then 'application'::public.audit_entity
@@ -325,20 +333,20 @@ begin
   end;
 
   v_action := lower(tg_op);
-
-  if tg_op = 'DELETE' then
-    v_entity_id := old.id;
-    v_details := jsonb_build_object('old', to_jsonb(old));
-  elsif tg_op = 'UPDATE' then
-    v_entity_id := new.id;
-    v_details := jsonb_build_object('old', to_jsonb(old), 'new', to_jsonb(new));
-  else
-    v_entity_id := new.id;
-    v_details := jsonb_build_object('new', to_jsonb(new));
-  end if;
+  v_entity_id := coalesce(new.id, old.id);
 
   insert into public.audit_logs (entity_type, entity_id, action, actor_id, details)
-  values (v_entity, v_entity_id, v_action, auth.uid(), coalesce(v_details, '{}'::jsonb));
+  values (
+    v_entity,
+    v_entity_id,
+    v_action,
+    auth.uid(),
+    case
+      when tg_op = 'DELETE' then jsonb_build_object('old', to_jsonb(old))
+      when tg_op = 'UPDATE' then jsonb_build_object('old', to_jsonb(old), 'new', to_jsonb(new))
+      else jsonb_build_object('new', to_jsonb(new))
+    end
+  );
 
   return coalesce(new, old);
 end;
@@ -369,16 +377,6 @@ create trigger notes_audit_trg
 after insert or update or delete on public.notes
 for each row execute procedure public.log_audit();
 
-drop trigger if exists user_profiles_audit_trg on public.user_profiles;
-create trigger user_profiles_audit_trg
-after insert or update or delete on public.user_profiles
-for each row execute procedure public.log_audit();
-
-drop trigger if exists application_lenders_audit_trg on public.application_lenders;
-create trigger application_lenders_audit_trg
-after insert or update or delete on public.application_lenders
-for each row execute procedure public.log_audit();
-
 alter table public.user_profiles enable row level security;
 alter table public.applications enable row level security;
 alter table public.application_lenders enable row level security;
@@ -407,25 +405,18 @@ using (id = auth.uid() or public.is_adminish());
 
 create policy "profiles_insert_self_or_superadmin"
 on public.user_profiles for insert
-with check (id = auth.uid() or public.is_super_admin());
+with check (id = auth.uid() or public.current_user_role() = 'super_admin');
 
 create policy "profiles_update_self_or_superadmin"
 on public.user_profiles for update
-using (id = auth.uid() or public.is_super_admin())
-with check (
-  (id = auth.uid() and role = (select role from public.user_profiles where id = auth.uid()))
-  or public.is_super_admin()
-);
+using (id = auth.uid() or public.current_user_role() = 'super_admin')
+with check (id = auth.uid() or public.current_user_role() = 'super_admin');
 
 create policy "applications_select_by_role"
 on public.applications for select
 using (
   borrower_id = auth.uid()
   or broker_id = auth.uid()
-  or exists (
-    select 1 from public.application_lenders al
-    where al.application_id = id and al.lender_id = auth.uid()
-  )
   or public.is_adminish()
 );
 
@@ -434,21 +425,35 @@ on public.applications for insert
 with check (
   public.current_user_role() in ('borrower', 'broker', 'admin', 'super_admin')
   and created_by = auth.uid()
+  and progress_step between 1 and 5
   and (
     (public.current_user_role() = 'borrower' and borrower_id = auth.uid() and broker_id is null)
-    or (public.current_user_role() in ('broker', 'admin', 'super_admin'))
+    or (public.current_user_role() = 'broker' and broker_id = auth.uid())
+    or public.is_adminish()
   )
 );
 
-create policy "applications_update_by_broker_admin"
+create policy "applications_update_by_role"
 on public.applications for update
 using (
   public.is_adminish()
   or (public.current_user_role() = 'broker' and broker_id = auth.uid())
+  or (
+    public.current_user_role() = 'borrower'
+    and borrower_id = auth.uid()
+    and status = 'draft'
+    and borrower_locked = false
+  )
 )
 with check (
   public.is_adminish()
   or (public.current_user_role() = 'broker' and broker_id = auth.uid())
+  or (
+    public.current_user_role() = 'borrower'
+    and borrower_id = auth.uid()
+    and status = 'draft'
+    and borrower_locked = false
+  )
 );
 
 create policy "application_lenders_select_visible"
@@ -458,8 +463,7 @@ using (
   or lender_id = auth.uid()
   or exists (
     select 1 from public.applications a
-    where a.id = application_id
-      and (a.borrower_id = auth.uid() or a.broker_id = auth.uid())
+    where a.id = application_id and (a.borrower_id = auth.uid() or a.broker_id = auth.uid())
   )
 );
 
@@ -543,8 +547,8 @@ create policy "docs_select_policy"
 on storage.objects for select
 to authenticated
 using (
-  bucket_id = 'application-docs' and
-  public.app_accessible(public.path_app_id(name))
+  bucket_id = 'application-docs'
+  and public.app_accessible(public.path_app_id(name))
 );
 
 create policy "docs_insert_policy"
@@ -561,3 +565,4 @@ on storage.objects for update
 to authenticated
 using (bucket_id = 'application-docs' and public.is_adminish())
 with check (bucket_id = 'application-docs' and public.is_adminish());
+
