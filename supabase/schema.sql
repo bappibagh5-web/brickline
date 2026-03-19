@@ -20,6 +20,10 @@ BEGIN
     CREATE TYPE public.note_type AS ENUM ('internal', 'borrower_visible');
   END IF;
 
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'document_status') THEN
+    CREATE TYPE public.document_status AS ENUM ('uploaded', 'under_review', 'accepted', 'rejected');
+  END IF;
+
   IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'audit_entity') THEN
     CREATE TYPE public.audit_entity AS ENUM ('application', 'document', 'note', 'user_profile', 'assignment');
   END IF;
@@ -36,6 +40,11 @@ alter type public.loan_type add value if not exists 'fix_flip';
 alter type public.loan_type add value if not exists 'dscr';
 alter type public.loan_type add value if not exists 'bridge';
 alter type public.loan_type add value if not exists 'construction';
+
+alter type public.document_status add value if not exists 'uploaded';
+alter type public.document_status add value if not exists 'under_review';
+alter type public.document_status add value if not exists 'accepted';
+alter type public.document_status add value if not exists 'rejected';
 
 create table if not exists public.user_profiles (
   id uuid primary key references auth.users(id) on delete cascade,
@@ -174,7 +183,9 @@ create table if not exists public.documents (
   application_id uuid not null references public.applications(id) on delete cascade,
   uploaded_by uuid not null references auth.users(id) on delete restrict,
   file_url text not null,
+  file_name text not null,
   document_type text not null,
+  status public.document_status not null default 'uploaded',
   created_by uuid not null references auth.users(id),
   updated_by uuid references auth.users(id),
   created_at timestamptz not null default now(),
@@ -207,6 +218,35 @@ BEGIN
     EXECUTE 'ALTER TABLE public.documents ADD COLUMN document_type text not null default ''general''';
   END IF;
 
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='documents' AND column_name='file_name') THEN
+    EXECUTE 'ALTER TABLE public.documents ADD COLUMN file_name text';
+    EXECUTE 'UPDATE public.documents SET file_name = split_part(file_url, ''/'', array_length(string_to_array(file_url, ''/''), 1)) WHERE file_name IS NULL';
+    EXECUTE 'UPDATE public.documents SET file_name = ''document.pdf'' WHERE file_name IS NULL OR file_name = ''''';
+    EXECUTE 'ALTER TABLE public.documents ALTER COLUMN file_name SET NOT NULL';
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='documents' AND column_name='status') THEN
+    EXECUTE 'ALTER TABLE public.documents ADD COLUMN status public.document_status not null default ''uploaded''';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema='public' AND table_name='documents' AND column_name='status' AND udt_name='text'
+  ) THEN
+    EXECUTE 'ALTER TABLE public.documents ALTER COLUMN status DROP DEFAULT';
+    EXECUTE $cmd$
+      ALTER TABLE public.documents
+      ALTER COLUMN status TYPE public.document_status
+      USING (
+        CASE
+          WHEN status::text in ('uploaded','under_review','accepted','rejected') THEN status::text::public.document_status
+          ELSE 'uploaded'::public.document_status
+        END
+      )
+    $cmd$;
+    EXECUTE 'ALTER TABLE public.documents ALTER COLUMN status SET DEFAULT ''uploaded''::public.document_status';
+  END IF;
+
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='documents' AND column_name='created_by') THEN
     EXECUTE 'ALTER TABLE public.documents ADD COLUMN created_by uuid references auth.users(id)';
     EXECUTE 'UPDATE public.documents SET created_by = uploaded_by WHERE created_by IS NULL';
@@ -220,10 +260,6 @@ BEGIN
 
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='documents' AND column_name='updated_at') THEN
     EXECUTE 'ALTER TABLE public.documents ADD COLUMN updated_at timestamptz not null default now()';
-  END IF;
-
-  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='documents' AND column_name='file_name') THEN
-    EXECUTE 'ALTER TABLE public.documents DROP COLUMN file_name';
   END IF;
 END
 $$;
@@ -497,6 +533,10 @@ on public.documents for update
 using (public.is_adminish())
 with check (public.is_adminish());
 
+create policy "documents_delete_by_admin"
+on public.documents for delete
+using (public.is_adminish());
+
 create policy "notes_select_visibility"
 on public.notes for select
 using (
@@ -524,7 +564,7 @@ on public.audit_logs for select
 using (public.is_adminish());
 
 insert into storage.buckets (id, name, public)
-values ('application-docs', 'application-docs', false)
+values ('documents', 'documents', false)
 on conflict (id) do nothing;
 
 DO $$
@@ -536,7 +576,7 @@ BEGIN
     FROM pg_policies
     WHERE schemaname = 'storage'
       AND tablename = 'objects'
-      AND policyname in ('docs_select_policy','docs_insert_policy','docs_update_policy')
+      AND policyname in ('docs_select_policy','docs_insert_policy','docs_update_policy','docs_delete_policy')
   LOOP
     EXECUTE format('drop policy if exists %I on %I.%I', p.policyname, p.schemaname, p.tablename);
   END LOOP;
@@ -547,7 +587,7 @@ create policy "docs_select_policy"
 on storage.objects for select
 to authenticated
 using (
-  bucket_id = 'application-docs'
+  bucket_id = 'documents'
   and public.app_accessible(public.path_app_id(name))
 );
 
@@ -555,7 +595,7 @@ create policy "docs_insert_policy"
 on storage.objects for insert
 to authenticated
 with check (
-  bucket_id = 'application-docs'
+  bucket_id = 'documents'
   and split_part(name, '/', 1) = auth.uid()::text
   and public.app_accessible(public.path_app_id(name))
 );
@@ -563,6 +603,24 @@ with check (
 create policy "docs_update_policy"
 on storage.objects for update
 to authenticated
-using (bucket_id = 'application-docs' and public.is_adminish())
-with check (bucket_id = 'application-docs' and public.is_adminish());
+using (bucket_id = 'documents' and public.is_adminish())
+with check (bucket_id = 'documents' and public.is_adminish());
+
+create policy "docs_delete_policy"
+on storage.objects for delete
+to authenticated
+using (bucket_id = 'documents' and public.is_adminish());
+
+
+
+
+
+
+
+
+
+
+
+
+
 

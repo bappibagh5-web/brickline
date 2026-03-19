@@ -139,7 +139,7 @@ export async function uploadDocumentAction(_: ActionState, formData: FormData): 
   const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
   const filePath = `${user.id}/${applicationId}/${randomUUID()}-${safeName}`;
 
-  const { error: uploadError } = await supabase.storage.from('application-docs').upload(filePath, file, {
+  const { error: uploadError } = await supabase.storage.from('documents').upload(filePath, file, {
     cacheControl: '3600',
     upsert: false
   });
@@ -152,7 +152,9 @@ export async function uploadDocumentAction(_: ActionState, formData: FormData): 
     application_id: applicationId,
     uploaded_by: user.id,
     file_url: filePath,
+    file_name: file.name,
     document_type: documentType,
+    status: 'uploaded',
     created_by: user.id,
     updated_by: user.id
   });
@@ -281,4 +283,5 @@ export async function routeToRoleHomeAction() {
 
   redirect(ROLE_HOME[profile.role]);
 }
+
 

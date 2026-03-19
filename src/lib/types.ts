@@ -10,6 +10,16 @@ export type EntityType = 'individual' | 'llc';
 
 export type ExitStrategy = 'sell' | 'refinance' | 'rent';
 
+export type DocumentType =
+  | 'id_doc'
+  | 'bank_statement'
+  | 'purchase_contract'
+  | 'rent_roll'
+  | 'rehab_budget'
+  | 'other';
+
+export type DocumentStatus = 'uploaded' | 'under_review' | 'accepted' | 'rejected';
+
 export interface IntakeData {
   borrower_name?: string;
   email?: string;
@@ -57,7 +67,9 @@ export interface DocumentRecord {
   application_id: string;
   uploaded_by: string;
   file_url: string;
-  document_type: string;
+  file_name: string;
+  document_type: DocumentType | string;
+  status: DocumentStatus;
   created_by: string;
   updated_by: string | null;
   created_at: string;
