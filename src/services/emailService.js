@@ -13,13 +13,20 @@ function getFromAddress() {
   return process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev';
 }
 
+function getFrontendBaseUrl() {
+  return String(process.env.FRONTEND_BASE_URL || 'http://localhost:5174')
+    .trim()
+    .replace(/\/+$/, '');
+}
+
 async function sendMagicLinkEmail(email, applicationId) {
   const recipient = String(email || '').trim().toLowerCase();
   if (!recipient) {
     throw new Error('Email is required to send magic link.');
   }
 
-  const link = `http://localhost:5174/set-password?applicationId=${applicationId}`;
+  const frontendBaseUrl = getFrontendBaseUrl();
+  const link = `${frontendBaseUrl}/set-password?applicationId=${applicationId}`;
   const resend = getResendClient();
   const fromAddress = getFromAddress();
 
