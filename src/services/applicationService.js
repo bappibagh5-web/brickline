@@ -1,5 +1,6 @@
 const { supabase } = require('../config/supabase');
 const conditionService = require('./conditionService');
+const { sendMagicLinkEmail } = require('./emailService');
 
 async function createApplication(userId) {
   const { data, error } = await supabase
@@ -108,15 +109,29 @@ async function saveApplicationStep(applicationId, stepKey, stepData) {
   }
 
   await insertStepCompletedEvent(applicationId, stepKey);
+  let emailSent = false;
 
-  const isEmailStep = stepKey === 'emailStep' || (stepData && typeof stepData.email === 'string');
-  const developmentVerificationLink = isEmailStep
-    ? `http://localhost:5174/set-password?applicationId=${applicationId}`
-    : null;
+  const isAccountCreationTriggerStep =
+    stepKey === 'fullName' ||
+    (stepData && typeof stepData.first_name === 'string' && typeof stepData.last_name === 'string');
+
+  if (isAccountCreationTriggerStep) {
+    const email = String(merged.application_data?.email || '').trim().toLowerCase();
+
+    if (email) {
+      const existingUser = await findAuthUserByEmail(email);
+      if (existingUser) {
+        await attachUserToApplication(applicationId, existingUser.id).catch(() => null);
+      }
+
+      await sendMagicLinkEmail(email, applicationId);
+      emailSent = true;
+    }
+  }
 
   return {
     application: merged,
-    development_verification_link: developmentVerificationLink
+    email_sent: emailSent
   };
 }
 
@@ -242,12 +257,14 @@ async function createAccountForApplication(applicationId, email, password) {
 
 const FALLBACK_STEP_ORDER = [
   'loan_program',
-  'experience',
+  'deals_last_24',
   'property_state',
-  'has_entity',
   'email',
   'phone',
-  'name'
+  'name',
+  'has_entity',
+  'entity_name',
+  'property_address'
 ];
 
 function parseEventStep(event) {

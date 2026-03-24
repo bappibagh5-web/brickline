@@ -131,6 +131,19 @@ export default function SetPassword() {
         throw signInResult.error;
       }
 
+      const signedInUserId = signInResult.data?.user?.id;
+      if (signedInUserId) {
+        await fetch(`${apiBaseUrl}/applications/${applicationId}/attach-user`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            user_id: signedInUserId
+          })
+        }).catch(() => null);
+      }
+
       setStoredFunnelEmail(email.trim());
       navigate('/dashboard', { replace: true });
     } catch (submitError) {

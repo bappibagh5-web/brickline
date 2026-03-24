@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { ChevronLeft } from 'lucide-react';
 import { Navigate, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext.jsx';
 import { funnelConfig, funnelInitialStepId } from './config.js';
 import { useFunnel } from './FunnelContext.jsx';
 import { getNextRoute, getStepByRoute } from './utils.js';
@@ -16,6 +17,18 @@ const US_STATES = [
   'NM', 'NY', 'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC', 'SD', 'TN', 'TX', 'UT', 'VT',
   'VA', 'WA', 'WV', 'WI', 'WY'
 ];
+
+function getStepValue(step, answers) {
+  if (step.type === 'name') {
+    return {
+      first_name: answers.first_name || '',
+      last_name: answers.last_name || ''
+    };
+  }
+
+  if (!step.key) return null;
+  return answers[step.key] ?? '';
+}
 
 function StepRenderer({ step, value, setValue }) {
   if (step.options) {
@@ -62,6 +75,7 @@ function StepRenderer({ step, value, setValue }) {
   }
 
   if (step.type === 'input') {
+    const inputPlaceholder = step.key === 'email' ? 'Enter Your Email Address' : 'Type your answer';
     return (
       <div className="mt-6">
         <input
@@ -69,7 +83,28 @@ function StepRenderer({ step, value, setValue }) {
           value={value || ''}
           onChange={(event) => setValue(event.target.value)}
           className="h-11 w-full rounded-none border border-[#9aa4ae] bg-[#f4f5f5] px-4 text-[14px] text-[#475569] placeholder:text-[#8d96b6] transition-all duration-150 focus:border-[#4e6bf0] focus:bg-[#f3f6ff] focus:outline-none"
-          placeholder="Type your answer"
+          placeholder={inputPlaceholder}
+        />
+      </div>
+    );
+  }
+
+  if (step.type === 'name') {
+    return (
+      <div className="mt-6 grid gap-2.5">
+        <input
+          type="text"
+          value={value?.first_name || ''}
+          onChange={(event) => setValue({ ...value, first_name: event.target.value })}
+          className="h-11 w-full rounded-none border border-[#9aa4ae] bg-[#f4f5f5] px-4 text-[14px] text-[#475569] placeholder:text-[#8d96b6] transition-all duration-150 focus:border-[#4e6bf0] focus:bg-[#f3f6ff] focus:outline-none"
+          placeholder="First name"
+        />
+        <input
+          type="text"
+          value={value?.last_name || ''}
+          onChange={(event) => setValue({ ...value, last_name: event.target.value })}
+          className="h-11 w-full rounded-none border border-[#9aa4ae] bg-[#f4f5f5] px-4 text-[14px] text-[#475569] placeholder:text-[#8d96b6] transition-all duration-150 focus:border-[#4e6bf0] focus:bg-[#f3f6ff] focus:outline-none"
+          placeholder="Last name"
         />
       </div>
     );
@@ -84,13 +119,14 @@ export default function FunnelStepPage() {
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const { answers, setAnswer } = useFunnel();
+  const { user } = useAuth();
   const [applicationId, setApplicationId] = useState(
     () => searchParams.get('applicationId') || getStoredApplicationId() || ''
   );
   const [initializing, setInitializing] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const [devContinueLink, setDevContinueLink] = useState('');
+  const [checkEmailSaved, setCheckEmailSaved] = useState(false);
 
   const current = getStepByRoute(location.pathname);
 
@@ -99,10 +135,22 @@ export default function FunnelStepPage() {
   }
 
   const { stepId, step } = current;
-  const value = step.key ? answers[step.key] : null;
-  const isEmailStep = stepId === 'emailStep';
+  const value = getStepValue(step, answers);
+  const isEmailCapture = stepId === 'emailCapture';
 
-  const canProceed = step.key ? Boolean(String(value || '').trim()) : true;
+  const canProceed = (() => {
+    if (step.type === 'name') {
+      const firstName = String(value?.first_name || '').trim();
+      const lastName = String(value?.last_name || '').trim();
+      return Boolean(firstName && lastName);
+    }
+
+    if (!step.key) {
+      return Boolean(step.next);
+    }
+
+    return Boolean(String(value || '').trim());
+  })();
 
   useEffect(() => {
     let ignore = false;
@@ -167,46 +215,130 @@ export default function FunnelStepPage() {
     };
   }, [apiBaseUrl, searchParams, setSearchParams]);
 
+  useEffect(() => {
+    if (stepId !== 'accountCreationFlow' && checkEmailSaved) {
+      setCheckEmailSaved(false);
+      return;
+    }
+
+    if (stepId !== 'accountCreationFlow' || !applicationId || checkEmailSaved) {
+      return;
+    }
+
+    let ignore = false;
+    const persistCheckEmailStep = async () => {
+      try {
+        const response = await fetch(`${apiBaseUrl}/applications/${applicationId}/save-step`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            step_key: stepId,
+            data: { check_email_viewed: true }
+          })
+        });
+
+        if (!response.ok || ignore) return;
+        setCheckEmailSaved(true);
+      } catch (_error) {
+        // Keep flow resilient even if this persistence call fails.
+      }
+    };
+
+    persistCheckEmailStep();
+
+    return () => {
+      ignore = true;
+    };
+  }, [apiBaseUrl, applicationId, checkEmailSaved, stepId]);
+
+  const setStepValue = (nextValue) => {
+    if (step.type === 'name') {
+      const firstName = String(nextValue?.first_name || '');
+      const lastName = String(nextValue?.last_name || '');
+      const fullName = `${firstName} ${lastName}`.trim();
+
+      setAnswer('first_name', firstName);
+      setAnswer('last_name', lastName);
+      setAnswer('name', fullName);
+      return;
+    }
+
+    if (!step.key) return;
+    setAnswer(step.key, nextValue);
+  };
+
+  const getStepPayload = () => {
+    if (step.type === 'name') {
+      const firstName = String(value?.first_name || '').trim();
+      const lastName = String(value?.last_name || '').trim();
+      return {
+        first_name: firstName,
+        last_name: lastName,
+        name: `${firstName} ${lastName}`.trim()
+      };
+    }
+
+    if (!step.key) {
+      return null;
+    }
+
+    return {
+      [step.key]: value
+    };
+  };
+
   const handleNext = async () => {
     if (!canProceed) return;
 
     setError('');
-    setDevContinueLink('');
     setSaving(true);
 
     try {
-      if (step.key && applicationId) {
-      if (step.key === 'email' && typeof value === 'string') {
+      const payloadData = getStepPayload();
+      const shouldSaveStep = Boolean(payloadData && applicationId);
+
+      if (isEmailCapture && typeof value === 'string') {
         setStoredFunnelEmail(value);
       }
 
-      const response = await fetch(`${apiBaseUrl}/applications/${applicationId}/save-step`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          step_key: stepId,
-          data: {
-            [step.key]: value
-          }
-        })
+      if (shouldSaveStep) {
+        if (stepId === 'fullName' && user?.id) {
+          await fetch(`${apiBaseUrl}/applications/${applicationId}/attach-user`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              user_id: user.id
+            })
+          }).catch(() => null);
+        }
+
+        const response = await fetch(`${apiBaseUrl}/applications/${applicationId}/save-step`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            step_key: stepId,
+            data: payloadData
+          })
+        });
+
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          setError(payload?.error || 'Failed to save step.');
+          return;
+        }
+      }
+
+      const nextRoute = getNextRoute(stepId, value, answers, {
+        isAuthenticated: Boolean(user)
       });
-
-      const payload = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        setError(payload?.error || 'Failed to save step.');
-        return;
-      }
-
-      if (isEmailStep && payload?.development_verification_link) {
-        setDevContinueLink(payload.development_verification_link);
-        return;
-      }
-    }
-
-      const nextRoute = getNextRoute(stepId, value);
       if (!nextRoute) return;
+
       if (applicationId) {
         navigate(`${nextRoute}?applicationId=${applicationId}`);
         return;
@@ -217,9 +349,8 @@ export default function FunnelStepPage() {
     }
   };
 
-  const handleContinueSetup = () => {
-    if (!devContinueLink) return;
-    window.location.assign(devContinueLink);
+  const handleOpenEmail = () => {
+    window.open('https://mail.google.com', '_blank', 'noopener,noreferrer');
   };
 
   const handleBack = () => {
@@ -254,16 +385,16 @@ export default function FunnelStepPage() {
             <StepRenderer
               step={step}
               value={value}
-              setValue={(nextValue) => setAnswer(step.key, nextValue)}
+              setValue={setStepValue}
             />
 
-            {devContinueLink ? (
+            {stepId === 'accountCreationFlow' ? (
               <button
                 type="button"
-                onClick={handleContinueSetup}
+                onClick={handleOpenEmail}
                 className="mt-6 inline-flex h-10 min-w-[140px] items-center justify-center rounded bg-[#2f54eb] px-4 text-sm font-semibold text-white transition-all duration-150 hover:bg-[#2246d0]"
               >
-                Continue setup
+                Open your email
               </button>
             ) : step.next ? (
               <button

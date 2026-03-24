@@ -13,6 +13,7 @@ import Admin from './pages/Admin.jsx';
 import Broker from './pages/Broker.jsx';
 import Lender from './pages/Lender.jsx';
 import Login from './pages/Login.jsx';
+import RateCalculator from './pages/RateCalculator.jsx';
 import SetPassword from './pages/SetPassword.jsx';
 import SuperAdmin from './pages/SuperAdmin.jsx';
 
@@ -75,7 +76,9 @@ function DashboardRouteView() {
       hydrateAnswers(payload.data);
     }
 
-    const route = getResumeTargetRoute(payload?.last_step, payload?.data || {});
+    const route = getResumeTargetRoute(payload?.last_step, payload?.data || {}, {
+      isAuthenticated: Boolean(user)
+    });
     if (!route) {
       navigate('/get-rate/loan-program');
       return;
@@ -111,7 +114,9 @@ function DashboardRouteView() {
         hydrateAnswers(payload.data);
       }
 
-      const route = getResumeTargetRoute(payload?.last_step, payload?.data || {});
+      const route = getResumeTargetRoute(payload?.last_step, payload?.data || {}, {
+        isAuthenticated: Boolean(user)
+      });
       if (!route) return;
 
       navigate(`${route}?applicationId=${applicationId}`, { replace: true });
@@ -122,7 +127,7 @@ function DashboardRouteView() {
     return () => {
       ignore = true;
     };
-  }, [apiBaseUrl, hydrateAnswers, location.pathname, navigate]);
+  }, [apiBaseUrl, hydrateAnswers, location.pathname, navigate, user]);
 
   return (
     <DashboardApp
@@ -156,6 +161,7 @@ export default function App() {
   return (
     <Routes>
       <Route path="/m/*" element={<FunnelStepPage />} />
+      <Route path="/check-email" element={<FunnelStepPage />} />
       <Route
         path="/get-rate"
         element={<Navigate to={funnelConfig[funnelInitialStepId].route} replace />}
@@ -195,6 +201,9 @@ export default function App() {
         <Route path="/messages" element={<DashboardRouteView />} />
         <Route path="/tasks" element={<DashboardRouteView />} />
         <Route path="/resources" element={<DashboardRouteView />} />
+        <Route path="/standardBorrower/*" element={<FunnelStepPage />} />
+        <Route path="/proBorrower/*" element={<FunnelStepPage />} />
+        <Route path="/rate-calculator" element={<RateCalculator />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />

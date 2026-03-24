@@ -103,7 +103,7 @@ async function saveApplicationStep(req, res, next) {
       id: result.application.id,
       status: result.application.status,
       application_data: result.application.application_data || {},
-      development_verification_link: result.development_verification_link
+      email_sent: result.email_sent || false
     });
   } catch (error) {
     next(error);
