@@ -7,11 +7,29 @@ const fieldRoutes = require('./routes/fieldRoutes');
 const app = express();
 
 app.use(express.json());
+
+const defaultAllowedOrigins = [
+  'http://localhost:5174',
+  'http://127.0.0.1:5174',
+  'https://app.bricklinefunding.com'
+];
+
+const envAllowedOrigins = String(process.env.CORS_ORIGINS || '')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
+const allowedOrigins = [...new Set([...defaultAllowedOrigins, ...envAllowedOrigins])];
+
 app.use(cors({
-  origin: [
-    'http://localhost:5174',
-    'http://127.0.0.1:5174'
-  ],
+  origin(origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+      return;
+    }
+
+    callback(new Error('Not allowed by CORS'));
+  },
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));

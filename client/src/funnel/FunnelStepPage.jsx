@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { ChevronLeft } from 'lucide-react';
 import { Navigate, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
+import { getApiBaseUrl } from '../lib/apiBaseUrl.js';
 import { funnelConfig, funnelInitialStepId } from './config.js';
 import { useFunnel } from './FunnelContext.jsx';
 import { getNextRoute, getStepByRoute } from './utils.js';
@@ -114,7 +115,7 @@ function StepRenderer({ step, value, setValue }) {
 }
 
 export default function FunnelStepPage() {
-  const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
+  const apiBaseUrl = getApiBaseUrl();
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();

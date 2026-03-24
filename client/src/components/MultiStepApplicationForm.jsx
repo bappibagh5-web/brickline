@@ -2,12 +2,13 @@ import { useEffect, useMemo, useState } from 'react';
 import { getApplication, getFields, patchApplicationStep } from '../api/lendingApi.js';
 import DynamicField from './DynamicField.jsx';
 import { STEPS, createInitialFormData } from '../constants/steps.js';
+import { getApiBaseUrl } from '../lib/apiBaseUrl.js';
 import { shouldRenderField } from '../lib/formUtils.js';
 
 export default function MultiStepApplicationForm({
   applicationId,
   product = 'DSCR',
-  apiBaseUrl = 'http://localhost:3000'
+  apiBaseUrl = getApiBaseUrl()
 }) {
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [formData, setFormData] = useState(createInitialFormData);

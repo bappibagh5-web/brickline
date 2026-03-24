@@ -3,10 +3,11 @@ import { Navigate, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { getStoredApplicationId } from '../funnel/session.js';
+import { getApiBaseUrl } from '../lib/apiBaseUrl.js';
 import { getRoleHomeRoute, getUserRole } from '../lib/roleRouting.js';
 
 export default function Login() {
-  const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
+  const apiBaseUrl = getApiBaseUrl();
   const navigate = useNavigate();
   const { user, loading, role } = useAuth();
   const [email, setEmail] = useState('');

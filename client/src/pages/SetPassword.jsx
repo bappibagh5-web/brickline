@@ -7,11 +7,12 @@ import {
   setStoredApplicationId,
   setStoredFunnelEmail
 } from '../funnel/session.js';
+import { getApiBaseUrl } from '../lib/apiBaseUrl.js';
 import { getRoleHomeRoute } from '../lib/roleRouting.js';
 import { supabase } from '../lib/supabaseClient.js';
 
 export default function SetPassword() {
-  const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
+  const apiBaseUrl = getApiBaseUrl();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { user, role, loading } = useAuth();

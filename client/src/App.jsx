@@ -8,6 +8,7 @@ import { useFunnel } from './funnel/FunnelContext.jsx';
 import FunnelStepPage from './funnel/FunnelStepPage.jsx';
 import { getStoredApplicationId } from './funnel/session.js';
 import { getResumeTargetRoute } from './funnel/utils.js';
+import { getApiBaseUrl } from './lib/apiBaseUrl.js';
 import { getRoleHomeRoute } from './lib/roleRouting.js';
 import Admin from './pages/Admin.jsx';
 import Broker from './pages/Broker.jsx';
@@ -37,7 +38,7 @@ const PAGE_TO_ROUTE = {
 };
 
 function DashboardRouteView() {
-  const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
+  const apiBaseUrl = getApiBaseUrl();
   const location = useLocation();
   const navigate = useNavigate();
   const { user, signOut } = useAuth();
