@@ -12,21 +12,21 @@ import {
 const iconMap = {
   home: House,
   'loan-requests': FileText,
-  'account-documents': FolderOpen,
+  documents: FolderOpen,
   messages: MessageSquare,
   tasks: ListChecks,
   resources: GraduationCap
 };
 
-export default function Sidebar({ items, activeKey, onSelect }) {
+export default function Sidebar({ items, activeKey, onSelect, onGoResources }) {
   return (
-    <aside className="brickline-sidebar relative flex h-screen w-[280px] shrink-0 flex-col text-white">
-      <div className="flex h-[108px] items-center gap-3 border-b border-white/15 px-8">
+    <aside className="brickline-sidebar relative flex h-screen w-[260px] shrink-0 flex-col text-white">
+      <div className="flex h-16 items-center gap-3 border-b border-white/15 px-6">
         <PanelLeftClose size={28} />
-        <span className="text-[42px] font-bold tracking-tight">Brickline</span>
+        <span className="text-3xl font-bold tracking-tight">Brickline</span>
       </div>
 
-      <nav className="px-4 pt-6">
+      <nav className="px-3 pt-4">
         {items.map((item) => {
           const Icon = iconMap[item.key] || House;
           const active = activeKey === item.key;
@@ -35,7 +35,7 @@ export default function Sidebar({ items, activeKey, onSelect }) {
               key={item.key}
               type="button"
               onClick={() => onSelect(item.key)}
-              className={`relative mb-2 flex w-full items-center gap-4 rounded-xl px-4 py-4 text-left text-[15px] font-semibold transition ${
+              className={`relative mb-1 flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-semibold transition-all duration-150 ${
                 active ? 'bg-white/10' : 'hover:bg-white/10'
               }`}
             >
@@ -56,12 +56,8 @@ export default function Sidebar({ items, activeKey, onSelect }) {
         })}
       </nav>
 
-      <div className="mt-auto space-y-2 border-t border-white/20 px-4 py-6">
-        <button className="flex w-full items-center gap-4 rounded-xl px-4 py-3 text-left text-[15px] font-semibold hover:bg-white/10">
-          <GraduationCap size={22} />
-          Resources
-        </button>
-        <button className="flex w-full items-center gap-4 rounded-xl px-4 py-3 text-left text-[15px] font-semibold hover:bg-white/10">
+      <div className="mt-auto space-y-2 border-t border-white/20 px-3 py-4">
+        <button className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-semibold transition-all duration-150 hover:bg-white/10">
           <CircleHelp size={22} />
           Help & Feedback
         </button>

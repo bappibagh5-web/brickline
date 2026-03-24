@@ -1,8 +1,8 @@
 import { Bell, ChevronDown, Search } from 'lucide-react';
 
-export default function Topbar({ userEmail, onLogout }) {
+export default function Topbar({ userEmail, onLogout, onStartNewLoan }) {
   return (
-    <header className="flex h-[88px] items-center border-b border-[#dde2ef] bg-white px-4 lg:h-[108px] lg:px-8">
+    <header className="flex h-16 items-center border-b border-[#dde2ef] bg-white px-4 lg:px-6">
       <div className="relative max-w-[960px] flex-1">
         <Search className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[#8891ad]" />
         <input className="soft-input" placeholder="Search..." />
@@ -21,7 +21,7 @@ export default function Topbar({ userEmail, onLogout }) {
             {userEmail || 'User'}
           </span>
         </div>
-        <button className="topbar-btn !px-4 !py-2 lg:!px-6 lg:!py-3">
+        <button type="button" onClick={onStartNewLoan} className="topbar-btn">
           Start New Loan <ChevronDown className="ml-2" size={20} />
         </button>
         <button

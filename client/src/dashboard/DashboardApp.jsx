@@ -1,7 +1,7 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import Card from './components/Card.jsx';
 import DashboardLayout from './layout/DashboardLayout.jsx';
-import { NAV_ITEMS, UI_VARIANTS, advisor, loan_applications, message_threads, messages, recentActivity, conditions } from './data/mockData.js';
+import { NAV_ITEMS, advisor, loan_applications, message_threads, messages, recentActivity, conditions } from './data/mockData.js';
 import HomePage from './pages/HomePage.jsx';
 import LoanRequestsPage from './pages/LoanRequestsPage.jsx';
 import MessagesPage from './pages/MessagesPage.jsx';
@@ -15,21 +15,23 @@ function PlaceholderPage({ title }) {
   );
 }
 
-export default function DashboardApp({ activePage, onPageChange, onLogout, userEmail }) {
-  const [variants, setVariants] = useState(UI_VARIANTS);
-
-  const handleVariantChange = (page, variant) => {
-    setVariants((prev) => ({ ...prev, [page]: variant }));
-  };
-
+export default function DashboardApp({
+  activePage,
+  onPageChange,
+  onLogout,
+  onStartNewLoan,
+  onGoResources,
+  onContinueLoan,
+  userEmail
+}) {
   const page = useMemo(() => {
     if (activePage === 'home') {
       return (
         <HomePage
-          variant={variants.home}
-          onVariantChange={(variant) => handleVariantChange('home', variant)}
           loan={loan_applications[0]}
           recentActivity={recentActivity}
+          onContinueLoan={onContinueLoan}
+          onStartNewLoan={onStartNewLoan}
         />
       );
     }
@@ -37,10 +39,9 @@ export default function DashboardApp({ activePage, onPageChange, onLogout, userE
     if (activePage === 'loan-requests') {
       return (
         <LoanRequestsPage
-          variant={variants['loan-requests']}
-          onVariantChange={(variant) => handleVariantChange('loan-requests', variant)}
-          loan={loan_applications[0]}
+          loans={loan_applications}
           advisor={advisor}
+          onContinueLoan={onContinueLoan}
         />
       );
     }
@@ -48,8 +49,6 @@ export default function DashboardApp({ activePage, onPageChange, onLogout, userE
     if (activePage === 'messages') {
       return (
         <MessagesPage
-          variant={variants.messages}
-          onVariantChange={(variant) => handleVariantChange('messages', variant)}
           threads={message_threads}
           chatMessages={messages}
         />
@@ -59,14 +58,12 @@ export default function DashboardApp({ activePage, onPageChange, onLogout, userE
     if (activePage === 'tasks') {
       return (
         <TasksPage
-          variant={variants.tasks}
-          onVariantChange={(variant) => handleVariantChange('tasks', variant)}
           tasks={conditions}
         />
       );
     }
 
-    if (activePage === 'account-documents') {
+    if (activePage === 'documents') {
       return <PlaceholderPage title="Account Documents" />;
     }
 
@@ -75,7 +72,7 @@ export default function DashboardApp({ activePage, onPageChange, onLogout, userE
     }
 
     return <PlaceholderPage title="Dashboard" />;
-  }, [activePage, variants]);
+  }, [activePage, onContinueLoan, onStartNewLoan]);
 
   return (
     <DashboardLayout
@@ -83,6 +80,8 @@ export default function DashboardApp({ activePage, onPageChange, onLogout, userE
       activePage={activePage}
       onPageChange={onPageChange}
       onLogout={onLogout}
+      onStartNewLoan={onStartNewLoan}
+      onGoResources={onGoResources}
       userEmail={userEmail}
     >
       {page}

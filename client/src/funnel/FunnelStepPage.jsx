@@ -4,7 +4,11 @@ import { Navigate, useLocation, useNavigate, useSearchParams } from 'react-route
 import { funnelConfig, funnelInitialStepId } from './config.js';
 import { useFunnel } from './FunnelContext.jsx';
 import { getNextRoute, getStepByRoute } from './utils.js';
-import { getStoredApplicationId, setStoredApplicationId } from './session.js';
+import {
+  getStoredApplicationId,
+  setStoredApplicationId,
+  setStoredFunnelEmail
+} from './session.js';
 
 const US_STATES = [
   'AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'FL', 'GA', 'HI', 'ID', 'IL', 'IN', 'IA',
@@ -16,7 +20,7 @@ const US_STATES = [
 function StepRenderer({ step, value, setValue }) {
   if (step.options) {
     return (
-      <div className="mt-6 grid gap-3">
+      <div className="mt-6 grid gap-2.5">
         {step.options.map((option) => {
           const selected = option.value === value;
           return (
@@ -24,10 +28,10 @@ function StepRenderer({ step, value, setValue }) {
               key={option.value}
               type="button"
               onClick={() => setValue(option.value)}
-              className={`rounded-xl border px-4 py-4 text-left text-base font-semibold transition ${
+              className={`h-11 rounded-none border px-4 text-left text-[14px] font-normal transition-all duration-150 ${
                 selected
-                  ? 'border-[#2f53eb] bg-[#eef2ff] text-[#2342c4]'
-                  : 'border-[#dbe2ef] bg-white text-[#263157] hover:border-[#b8c6ee]'
+                  ? 'border-[#4e6bf0] bg-[#eef2ff] text-[#1f3aa0]'
+                  : 'border-[#9aa4ae] bg-[#f4f5f5] text-[#475569] hover:border-[#4e6bf0] hover:bg-[#f3f6ff]'
               }`}
             >
               {option.label}
@@ -44,7 +48,7 @@ function StepRenderer({ step, value, setValue }) {
         <select
           value={value || ''}
           onChange={(event) => setValue(event.target.value)}
-          className="h-12 w-full rounded-xl border border-[#dbe2ef] bg-white px-4 text-base text-[#22305a] focus:border-[#4363ee] focus:outline-none"
+          className="h-11 w-full rounded-none border border-[#9aa4ae] bg-[#f4f5f5] px-4 text-[14px] text-[#475569] transition-all duration-150 focus:border-[#4e6bf0] focus:bg-[#f3f6ff] focus:outline-none"
         >
           <option value="">Select a state</option>
           {US_STATES.map((state) => (
@@ -64,7 +68,7 @@ function StepRenderer({ step, value, setValue }) {
           type={step.inputType || 'text'}
           value={value || ''}
           onChange={(event) => setValue(event.target.value)}
-          className="h-12 w-full rounded-xl border border-[#dbe2ef] bg-white px-4 text-base text-[#22305a] placeholder:text-[#8d96b6] focus:border-[#4363ee] focus:outline-none"
+          className="h-11 w-full rounded-none border border-[#9aa4ae] bg-[#f4f5f5] px-4 text-[14px] text-[#475569] placeholder:text-[#8d96b6] transition-all duration-150 focus:border-[#4e6bf0] focus:bg-[#f3f6ff] focus:outline-none"
           placeholder="Type your answer"
         />
       </div>
@@ -84,7 +88,9 @@ export default function FunnelStepPage() {
     () => searchParams.get('applicationId') || getStoredApplicationId() || ''
   );
   const [initializing, setInitializing] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [devContinueLink, setDevContinueLink] = useState('');
 
   const current = getStepByRoute(location.pathname);
 
@@ -94,6 +100,7 @@ export default function FunnelStepPage() {
 
   const { stepId, step } = current;
   const value = step.key ? answers[step.key] : null;
+  const isEmailStep = stepId === 'emailStep';
 
   const canProceed = step.key ? Boolean(String(value || '').trim()) : true;
 
@@ -164,8 +171,15 @@ export default function FunnelStepPage() {
     if (!canProceed) return;
 
     setError('');
+    setDevContinueLink('');
+    setSaving(true);
 
-    if (step.key && applicationId) {
+    try {
+      if (step.key && applicationId) {
+      if (step.key === 'email' && typeof value === 'string') {
+        setStoredFunnelEmail(value);
+      }
+
       const response = await fetch(`${apiBaseUrl}/applications/${applicationId}/save-step`, {
         method: 'POST',
         headers: {
@@ -184,15 +198,28 @@ export default function FunnelStepPage() {
         setError(payload?.error || 'Failed to save step.');
         return;
       }
+
+      if (isEmailStep && payload?.development_verification_link) {
+        setDevContinueLink(payload.development_verification_link);
+        return;
+      }
     }
 
-    const nextRoute = getNextRoute(stepId, value);
-    if (!nextRoute) return;
-    if (applicationId) {
-      navigate(`${nextRoute}?applicationId=${applicationId}`);
-      return;
+      const nextRoute = getNextRoute(stepId, value);
+      if (!nextRoute) return;
+      if (applicationId) {
+        navigate(`${nextRoute}?applicationId=${applicationId}`);
+        return;
+      }
+      navigate(nextRoute);
+    } finally {
+      setSaving(false);
     }
-    navigate(nextRoute);
+  };
+
+  const handleContinueSetup = () => {
+    if (!devContinueLink) return;
+    window.location.assign(devContinueLink);
   };
 
   const handleBack = () => {
@@ -201,46 +228,97 @@ export default function FunnelStepPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#f3f6fd] px-4 py-10">
-      <div className="w-full max-w-2xl rounded-2xl border border-[#dfe4f1] bg-white p-8 shadow-panel">
-        <div className="mb-4 flex items-center justify-between">
+    <div className="min-h-screen bg-[#f3f4f4] text-[#1f2937]">
+      <header className="flex h-12 items-center justify-between border-b border-[#d6d9db] bg-white px-5">
+        <p className="text-lg font-bold tracking-tight text-[#2f54eb]">Brickline</p>
+        <p className="text-xs text-[#4b5563]">Questions? 1-844-415-4663</p>
+      </header>
+
+      <main className="grid min-h-[calc(100vh-48px-72px)] grid-cols-1 lg:grid-cols-12">
+        <section className="px-5 py-10 lg:col-span-7 lg:px-16 xl:px-20">
           <button
             type="button"
             onClick={handleBack}
             disabled={stepId === funnelInitialStepId}
-            className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-sm font-semibold text-[#4e5c86] disabled:opacity-40"
+            className="mb-5 inline-flex items-center gap-1 rounded px-1 py-1 text-xs font-medium text-[#4e5c86] transition-all duration-150 hover:text-[#2f54eb] disabled:opacity-40"
           >
             <ChevronLeft size={16} /> Back
           </button>
-          <p className="text-xs font-semibold uppercase tracking-wide text-[#6d789a]">Brickline</p>
-        </div>
 
-        <h1 className="text-3xl font-bold text-[#1f2747]">{step.title || 'Continue'}</h1>
-        {step.description ? <p className="mt-2 text-base text-[#60709a]">{step.description}</p> : null}
-        {error ? <p className="mt-3 text-sm font-semibold text-[#b63d3d]">{error}</p> : null}
-        {initializing ? <p className="mt-3 text-sm text-[#60709a]">Starting application session...</p> : null}
+          <div className="max-w-[520px]">
+            <h1 className="text-[48px] text-[clamp(32px,3.2vw,48px)] font-normal leading-[1.1] tracking-[-0.02em] text-[#1f2937]">{step.title || 'Continue'}</h1>
+            {step.description ? <p className="mt-2 text-sm text-[#60709a]">{step.description}</p> : null}
+            {error ? <p className="mt-3 text-sm font-semibold text-[#b63d3d]">{error}</p> : null}
+            {initializing ? <p className="mt-3 text-xs text-[#60709a]">Starting application session...</p> : null}
 
-        <StepRenderer
-          step={step}
-          value={value}
-          setValue={(nextValue) => setAnswer(step.key, nextValue)}
-        />
+            <StepRenderer
+              step={step}
+              value={value}
+              setValue={(nextValue) => setAnswer(step.key, nextValue)}
+            />
 
-        {step.next ? (
-          <button
-            type="button"
-            onClick={handleNext}
-            disabled={!canProceed || initializing}
-            className="topbar-btn mt-7 w-full justify-center disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            Next
-          </button>
-        ) : (
-          <div className="mt-7 rounded-xl border border-[#d9e4ff] bg-[#eef3ff] p-4 text-center text-sm font-semibold text-[#2e51d4]">
-            Funnel complete
+            {devContinueLink ? (
+              <button
+                type="button"
+                onClick={handleContinueSetup}
+                className="mt-6 inline-flex h-10 min-w-[140px] items-center justify-center rounded bg-[#2f54eb] px-4 text-sm font-semibold text-white transition-all duration-150 hover:bg-[#2246d0]"
+              >
+                Continue setup
+              </button>
+            ) : step.next ? (
+              <button
+                type="button"
+                onClick={handleNext}
+                disabled={!canProceed || initializing || saving}
+                className="mt-6 ml-auto inline-flex h-10 min-w-[88px] items-center justify-center rounded bg-[#2f54eb] px-4 text-sm font-semibold text-white transition-all duration-150 hover:bg-[#2246d0] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {saving ? 'Saving...' : 'Next'}
+              </button>
+            ) : (
+              <div className="mt-6 max-w-[460px] rounded-md border border-[#cfd8ff] bg-[#eef2ff] p-3 text-center text-sm font-semibold text-[#1f3aa0]">
+                Funnel complete
+              </div>
+            )}
           </div>
-        )}
-      </div>
+        </section>
+
+        <aside className="relative hidden overflow-hidden border-l border-[#d6d9db] bg-white lg:col-span-5 lg:block">
+          <div className="absolute inset-0 bg-[#f2f4f5]" />
+          <div className="absolute left-[6%] top-0 h-full w-[130px] bg-[#4e6bf0]/85" />
+          <div className="absolute left-[24%] top-0 h-full w-[80px] bg-[#f6f7f8]" />
+          <div className="absolute right-[18%] top-0 h-full w-[130px] bg-[#4e6bf0]/85" />
+          <div className="absolute right-0 top-0 h-full w-[120px] bg-[#cfd8e2]" />
+          <div className="absolute left-[-10%] top-[14%] h-[180px] w-[320px] rotate-[38deg] bg-[#4e6bf0]/80" />
+          <div className="absolute right-[-8%] top-[36%] h-[180px] w-[320px] rotate-[38deg] bg-[#4e6bf0]/80" />
+          <div className="absolute left-[34%] top-[64%] h-[180px] w-[340px] rotate-[38deg] bg-[#ffffff]" />
+
+          <div className="absolute left-[18%] top-[0%] h-[42%] w-[44%] overflow-hidden">
+            <img
+              src="https://images.unsplash.com/photo-1521737604893-d14cc237f11d?auto=format&fit=crop&w=900&q=80"
+              alt="investor"
+              className="h-full w-full object-cover"
+            />
+          </div>
+          <div className="absolute left-[18%] top-[40%] h-[42%] w-[44%] overflow-hidden">
+            <img
+              src="https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=900&q=80"
+              alt="borrower"
+              className="h-full w-full object-cover"
+            />
+          </div>
+          <div className="absolute right-[2%] top-[24%] h-[48%] w-[36%] overflow-hidden">
+            <img
+              src="https://images.unsplash.com/photo-1504307651254-35680f356dfd?auto=format&fit=crop&w=900&q=80"
+              alt="property work"
+              className="h-full w-full object-cover"
+            />
+          </div>
+        </aside>
+      </main>
+
+      <footer className="border-t border-[#d9dddd] bg-[#f2f3f3] px-5 py-3 text-[11px] text-[#6b7280]">
+        <p>Terms of Service | Privacy Policy | Disclosures</p>
+      </footer>
     </div>
   );
 }

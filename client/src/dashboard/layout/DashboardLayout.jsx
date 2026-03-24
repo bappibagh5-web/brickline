@@ -6,17 +6,24 @@ export default function DashboardLayout({
   activePage,
   onPageChange,
   onLogout,
+  onStartNewLoan,
+  onGoResources,
   userEmail,
   children
 }) {
   return (
     <div className="flex min-h-screen bg-[#f5f6fc]">
       <div className="hidden lg:block">
-        <Sidebar items={navItems} activeKey={activePage} onSelect={onPageChange} />
+        <Sidebar
+          items={navItems}
+          activeKey={activePage}
+          onSelect={onPageChange}
+          onGoResources={onGoResources}
+        />
       </div>
       <div className="min-w-0 flex-1">
-        <Topbar onLogout={onLogout} userEmail={userEmail} />
-        <main className="p-4 lg:p-8">{children}</main>
+        <Topbar onLogout={onLogout} onStartNewLoan={onStartNewLoan} userEmail={userEmail} />
+        <main className="mx-auto w-full max-w-[1200px] p-4">{children}</main>
       </div>
     </div>
   );

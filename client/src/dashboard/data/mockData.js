@@ -1,18 +1,11 @@
 export const NAV_ITEMS = [
   { key: 'home', label: 'Home' },
   { key: 'loan-requests', label: 'Loan Requests' },
-  { key: 'account-documents', label: 'Account Documents' },
+  { key: 'documents', label: 'Account Documents' },
   { key: 'messages', label: 'Messages', badge: 1 },
   { key: 'tasks', label: 'Tasks' },
   { key: 'resources', label: 'Resources' }
 ];
-
-export const UI_VARIANTS = {
-  home: 'filled',
-  'loan-requests': 'filled',
-  messages: 'active',
-  tasks: 'filled'
-};
 
 export const loan_applications = [
   {
@@ -24,6 +17,36 @@ export const loan_applications = [
     status: 'In Progress',
     lastUpdated: '2 hours ago',
     nextStep: 'Property Information'
+  },
+  {
+    id: 'ln-2',
+    loanType: 'Rental Loan',
+    address: '88 Harbor Lane, Tampa, FL',
+    amountRequested: 420000,
+    progress: 18,
+    status: 'Draft',
+    lastUpdated: '1 day ago',
+    nextStep: 'Borrower Details'
+  },
+  {
+    id: 'ln-3',
+    loanType: 'Bridge Loan',
+    address: '500 Ocean Drive, Miami, FL',
+    amountRequested: 610000,
+    progress: 100,
+    status: 'Submitted',
+    lastUpdated: '3 days ago',
+    nextStep: 'Underwriting Review'
+  },
+  {
+    id: 'ln-4',
+    loanType: 'Fix & Flip Loan',
+    address: '245 Pine Street, Orlando, FL',
+    amountRequested: 290000,
+    progress: 100,
+    status: 'Closed',
+    lastUpdated: '2 weeks ago',
+    nextStep: 'Funded'
   }
 ];
 
@@ -31,7 +54,7 @@ export const conditions = [
   {
     id: 'tsk-1',
     title: 'Upload purchase contract',
-    loanMeta: 'Fix & Flip Loan · 123 Maple Street, Miami, FL',
+    loanMeta: 'Fix & Flip Loan - 123 Maple Street, Miami, FL',
     taskType: 'Document',
     dueLabel: 'Today',
     cta: 'Upload Document',
@@ -40,7 +63,7 @@ export const conditions = [
   {
     id: 'tsk-2',
     title: 'Complete Property Information',
-    loanMeta: 'Fix & Flip Loan · 123 Maple Street, Miami, FL',
+    loanMeta: 'Fix & Flip Loan - 123 Maple Street, Miami, FL',
     taskType: 'Application',
     dueLabel: 'Next step',
     cta: 'Continue Application',
@@ -49,7 +72,7 @@ export const conditions = [
   {
     id: 'tsk-3',
     title: 'Upload borrower government-issued ID',
-    loanMeta: 'Fix & Flip Loan · 123 Maple Street, Miami, FL',
+    loanMeta: 'Fix & Flip Loan - 123 Maple Street, Miami, FL',
     taskType: 'Document',
     dueLabel: 'Tomorrow',
     cta: 'Upload Document',
@@ -58,7 +81,7 @@ export const conditions = [
   {
     id: 'tsk-4',
     title: 'Add property photos',
-    loanMeta: 'Fix & Flip Loan · Documents',
+    loanMeta: 'Fix & Flip Loan - Documents',
     taskType: 'Document',
     dueLabel: '3 days',
     cta: 'View',
@@ -67,7 +90,7 @@ export const conditions = [
   {
     id: 'tsk-5',
     title: 'Upload contractor bid',
-    loanMeta: 'Fix & Flip Loan · Documents',
+    loanMeta: 'Fix & Flip Loan - Documents',
     taskType: 'Document',
     dueLabel: 'Next week',
     cta: 'View',
@@ -107,7 +130,7 @@ export const messages = [
     id: 'm-2',
     sender: 'advisor',
     body:
-      "You need a few documents for your DSCR Loan:\n• Property Information\n• Identity Verification\n• Business Entity Docs\n• Financials\nNeed help with any of these?",
+      'You need a few documents for your DSCR Loan:\n- Property Information\n- Identity Verification\n- Business Entity Docs\n- Financials\nNeed help with any of these?',
     time: '4 mins ago'
   },
   {

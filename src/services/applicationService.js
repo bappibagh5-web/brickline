@@ -109,7 +109,15 @@ async function saveApplicationStep(applicationId, stepKey, stepData) {
 
   await insertStepCompletedEvent(applicationId, stepKey);
 
-  return merged;
+  const isEmailStep = stepKey === 'emailStep' || (stepData && typeof stepData.email === 'string');
+  const developmentVerificationLink = isEmailStep
+    ? `http://localhost:5174/set-password?applicationId=${applicationId}`
+    : null;
+
+  return {
+    application: merged,
+    development_verification_link: developmentVerificationLink
+  };
 }
 
 async function attachUserToApplication(applicationId, userId) {
@@ -129,6 +137,107 @@ async function attachUserToApplication(applicationId, userId) {
   }
 
   return data;
+}
+
+async function listAllAuthUsers() {
+  const users = [];
+  let page = 1;
+  const perPage = 100;
+
+  while (true) {
+    const { data, error } = await supabase.auth.admin.listUsers({ page, perPage });
+
+    if (error) {
+      throw error;
+    }
+
+    const batch = data?.users || [];
+    users.push(...batch);
+
+    if (batch.length < perPage) {
+      break;
+    }
+
+    page += 1;
+  }
+
+  return users;
+}
+
+async function findAuthUserByEmail(email) {
+  const normalized = String(email || '').trim().toLowerCase();
+  if (!normalized) return null;
+
+  const users = await listAllAuthUsers();
+  return users.find((user) => String(user.email || '').toLowerCase() === normalized) || null;
+}
+
+async function createOrConfirmAuthUser(email, password) {
+  const normalizedEmail = String(email || '').trim().toLowerCase();
+
+  const created = await supabase.auth.admin.createUser({
+    email: normalizedEmail,
+    password,
+    email_confirm: true,
+    user_metadata: { role: 'borrower' }
+  });
+
+  if (!created.error && created.data?.user) {
+    return created.data.user;
+  }
+
+  const errorMessage = String(created.error?.message || '').toLowerCase();
+  const isExistingUser =
+    errorMessage.includes('already') ||
+    errorMessage.includes('exists') ||
+    errorMessage.includes('registered');
+
+  if (!isExistingUser) {
+    throw created.error;
+  }
+
+  const existing = await findAuthUserByEmail(normalizedEmail);
+  if (!existing) {
+    throw created.error;
+  }
+
+  const updated = await supabase.auth.admin.updateUserById(existing.id, {
+    password,
+    email_confirm: true,
+    user_metadata: {
+      ...(existing.user_metadata || {}),
+      role: (existing.user_metadata && existing.user_metadata.role) || 'borrower'
+    }
+  });
+
+  if (updated.error) {
+    throw updated.error;
+  }
+
+  return updated.data.user;
+}
+
+async function createAccountForApplication(applicationId, email, password) {
+  const application = await getApplicationById(applicationId);
+
+  if (!application) {
+    return null;
+  }
+
+  const authUser = await createOrConfirmAuthUser(email, password);
+
+  const updatedApplication = await attachUserToApplication(applicationId, authUser.id);
+  if (!updatedApplication) {
+    return null;
+  }
+
+  await mergeApplicationData(applicationId, { email }).catch(() => null);
+
+  return {
+    application: updatedApplication,
+    user_id: authUser.id,
+    email: authUser.email
+  };
 }
 
 const FALLBACK_STEP_ORDER = [
@@ -208,5 +317,6 @@ module.exports = {
   mergeApplicationData,
   saveApplicationStep,
   attachUserToApplication,
+  createAccountForApplication,
   getApplicationResume
 };

@@ -1,7 +1,6 @@
 import { Paperclip, Phone, Search, SendHorizontal } from 'lucide-react';
 import Card from '../components/Card.jsx';
 import ChatMessage from '../components/ChatMessage.jsx';
-import PageVariantToggle from '../components/PageVariantToggle.jsx';
 
 function EmptyConversationState() {
   return (
@@ -69,14 +68,13 @@ function ActiveConversationState({ thread, chatMessages }) {
   );
 }
 
-export default function MessagesPage({ variant, onVariantChange, threads, chatMessages }) {
+export default function MessagesPage({ threads, chatMessages }) {
   const activeThread = threads[0];
 
   return (
     <section>
-      <div className="mb-5 flex items-center justify-between">
+      <div className="mb-4">
         <h1 className="section-title">Messages</h1>
-        <PageVariantToggle value={variant} options={['active', 'empty']} onChange={onVariantChange} />
       </div>
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
@@ -102,11 +100,7 @@ export default function MessagesPage({ variant, onVariantChange, threads, chatMe
         </Card>
 
         <Card className="overflow-hidden xl:col-span-9">
-          {variant === 'empty' ? (
-            <EmptyConversationState />
-          ) : (
-            <ActiveConversationState thread={activeThread} chatMessages={chatMessages} />
-          )}
+          <ActiveConversationState thread={activeThread} chatMessages={chatMessages} />
         </Card>
       </div>
     </section>

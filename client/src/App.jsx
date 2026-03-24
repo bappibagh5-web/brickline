@@ -13,24 +13,25 @@ import Admin from './pages/Admin.jsx';
 import Broker from './pages/Broker.jsx';
 import Lender from './pages/Lender.jsx';
 import Login from './pages/Login.jsx';
+import SetPassword from './pages/SetPassword.jsx';
 import SuperAdmin from './pages/SuperAdmin.jsx';
 
 const ROUTE_TO_PAGE = {
   '/dashboard': 'home',
   '/': 'home',
   '/loan-requests': 'loan-requests',
+  '/documents': 'documents',
   '/messages': 'messages',
   '/tasks': 'tasks',
-  '/account-documents': 'account-documents',
   '/resources': 'resources'
 };
 
 const PAGE_TO_ROUTE = {
   home: '/dashboard',
   'loan-requests': '/loan-requests',
+  documents: '/documents',
   messages: '/messages',
   tasks: '/tasks',
-  'account-documents': '/account-documents',
   resources: '/resources'
 };
 
@@ -46,6 +47,41 @@ function DashboardRouteView() {
   const handlePageChange = (pageKey) => {
     const route = PAGE_TO_ROUTE[pageKey] || '/dashboard';
     navigate(route);
+  };
+
+  const handleStartNewLoan = () => {
+    navigate('/get-rate/loan-program');
+  };
+
+  const handleGoResources = () => {
+    navigate('/resources');
+  };
+
+  const handleContinueLoan = async () => {
+    const applicationId = getStoredApplicationId();
+    if (!applicationId) {
+      navigate('/get-rate/loan-program');
+      return;
+    }
+
+    const response = await fetch(`${apiBaseUrl}/applications/${applicationId}/resume`);
+    if (!response.ok) {
+      navigate('/get-rate/loan-program');
+      return;
+    }
+
+    const payload = await response.json();
+    if (payload?.data && typeof payload.data === 'object') {
+      hydrateAnswers(payload.data);
+    }
+
+    const route = getResumeTargetRoute(payload?.last_step, payload?.data || {});
+    if (!route) {
+      navigate('/get-rate/loan-program');
+      return;
+    }
+
+    navigate(`${route}?applicationId=${applicationId}`);
   };
 
   const handleLogout = async () => {
@@ -93,6 +129,9 @@ function DashboardRouteView() {
       activePage={activePage}
       onPageChange={handlePageChange}
       onLogout={handleLogout}
+      onStartNewLoan={handleStartNewLoan}
+      onGoResources={handleGoResources}
+      onContinueLoan={handleContinueLoan}
       userEmail={user?.email || ''}
     />
   );
@@ -121,6 +160,11 @@ export default function App() {
         path="/get-rate"
         element={<Navigate to={funnelConfig[funnelInitialStepId].route} replace />}
       />
+      <Route
+        path="/get-rate/loan-program"
+        element={<Navigate to={funnelConfig[funnelInitialStepId].route} replace />}
+      />
+      <Route path="/set-password" element={<SetPassword />} />
       <Route path="/login" element={<Login />} />
 
       <Route element={<ProtectedRoute />}>
@@ -146,9 +190,10 @@ export default function App() {
 
       <Route element={<ProtectedRoute allowedRoles={['borrower']} />}>
         <Route path="/loan-requests" element={<DashboardRouteView />} />
+        <Route path="/documents" element={<DashboardRouteView />} />
+        <Route path="/account-documents" element={<Navigate to="/documents" replace />} />
         <Route path="/messages" element={<DashboardRouteView />} />
         <Route path="/tasks" element={<DashboardRouteView />} />
-        <Route path="/account-documents" element={<DashboardRouteView />} />
         <Route path="/resources" element={<DashboardRouteView />} />
       </Route>
 

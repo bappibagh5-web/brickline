@@ -93,16 +93,17 @@ async function saveApplicationStep(req, res, next) {
       throw createHttpError(400, 'data must be a JSON object.');
     }
 
-    const updatedApplication = await applicationService.saveApplicationStep(id, stepKey, data);
+    const result = await applicationService.saveApplicationStep(id, stepKey, data);
 
-    if (!updatedApplication) {
+    if (!result || !result.application) {
       throw createHttpError(404, 'Application not found.');
     }
 
     res.status(200).json({
-      id: updatedApplication.id,
-      status: updatedApplication.status,
-      application_data: updatedApplication.application_data || {}
+      id: result.application.id,
+      status: result.application.status,
+      application_data: result.application.application_data || {},
+      development_verification_link: result.development_verification_link
     });
   } catch (error) {
     next(error);
@@ -134,6 +135,36 @@ async function attachUserToApplication(req, res, next) {
   }
 }
 
+async function createAccountForApplication(req, res, next) {
+  try {
+    const { id } = req.params;
+    const { email, password } = req.body || {};
+
+    if (!email || typeof email !== 'string') {
+      throw createHttpError(400, 'email is required.');
+    }
+
+    if (!password || typeof password !== 'string') {
+      throw createHttpError(400, 'password is required.');
+    }
+
+    const result = await applicationService.createAccountForApplication(id, email, password);
+
+    if (!result) {
+      throw createHttpError(404, 'Application not found.');
+    }
+
+    res.status(200).json({
+      id: result.application.id,
+      user_id: result.user_id,
+      email: result.email,
+      status: result.application.status
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
 async function getApplicationResume(req, res, next) {
   try {
     const { id } = req.params;
@@ -156,5 +187,6 @@ module.exports = {
   updateApplication,
   saveApplicationStep,
   attachUserToApplication,
+  createAccountForApplication,
   getApplicationResume
 };

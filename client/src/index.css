@@ -5,8 +5,28 @@
 @tailwind utilities;
 
 @layer base {
+  html {
+    font-size: 14px;
+  }
+
   body {
-    @apply m-0 bg-[#f5f6fc] font-sans text-[#1f2747];
+    @apply m-0 bg-[#f8fafc] font-sans text-[#1f2747] text-sm;
+  }
+
+  h1 {
+    @apply text-2xl font-semibold;
+  }
+
+  h2 {
+    @apply text-[20px] font-semibold;
+  }
+
+  h3 {
+    @apply text-base font-semibold;
+  }
+
+  small {
+    @apply text-xs;
   }
 }
 
@@ -16,18 +36,18 @@
   }
 
   .topbar-btn {
-    @apply inline-flex items-center rounded-xl bg-gradient-to-r from-brickline-500 to-brickline-600 px-6 py-3 font-semibold text-white shadow-panel transition hover:brightness-105;
+    @apply inline-flex h-10 items-center rounded-md bg-gradient-to-r from-brickline-500 to-brickline-600 px-4 text-sm font-semibold text-white shadow-panel transition-all duration-150 hover:brightness-105;
   }
 
   .panel {
-    @apply rounded-2xl border border-[#e6e8f2] bg-white shadow-[0_2px_10px_rgba(15,35,95,0.04)];
+    @apply rounded-xl border border-[#e6e8f2] bg-white shadow-[0_2px_6px_rgba(0,0,0,0.05)];
   }
 
   .section-title {
-    @apply text-4xl font-bold leading-tight tracking-[-0.02em] text-[#1d2548] lg:text-5xl;
+    @apply text-2xl font-semibold leading-tight tracking-[-0.01em] text-[#1d2548];
   }
 
   .soft-input {
-    @apply h-12 w-full rounded-xl border border-[#dfe3ef] bg-white px-12 text-base font-medium text-[#323a5a] placeholder:text-[#8f96b4] focus:border-brickline-400 focus:outline-none;
+    @apply h-10 w-full rounded-md border border-[#dfe3ef] bg-white px-10 text-sm font-medium text-[#323a5a] placeholder:text-[#8f96b4] focus:border-brickline-400 focus:outline-none;
   }
 }
