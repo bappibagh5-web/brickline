@@ -216,7 +216,7 @@ export default function RateCalculatorPage() {
         comp_value: compValue
       });
 
-      navigate(`/m/standardBorrower/financePropertyAddress?applicationId=${effectiveApplicationId}`);
+      navigate(`/m/standardBorrower/eligibility?applicationId=${effectiveApplicationId}`);
     } catch (saveError) {
       setError(saveError.message || 'Failed to save selected loan product.');
     } finally {

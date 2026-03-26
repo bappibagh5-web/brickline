@@ -153,16 +153,15 @@ export const funnelConfig = {
     step_key: 'rate_calculator',
     route: '/rate-calculator',
     title: 'Rate Calculator',
-    next: 'financePropertyAddress'
+    next: 'eligibilityConfirm'
   },
 
-  financePropertyAddress: {
-    step_key: 'finance_property_address',
-    route: '/m/standardBorrower/financePropertyAddress',
-    key: 'finance_property_address',
-    title: 'What is the address of the property you would like to finance?',
-    type: 'address',
-    addressPrefix: 'finance_property',
+  eligibilityConfirm: {
+    step_key: 'eligibility_confirmations',
+    route: '/m/standardBorrower/eligibility',
+    key: 'eligibility_confirmations',
+    title: 'Please confirm that the following statements are true:',
+    type: 'eligibilityConfirm',
     next: 'preferredSigningDate'
   },
 
@@ -172,6 +171,16 @@ export const funnelConfig = {
     key: 'preferred_signing_date',
     title: 'What is your preferred signing date?',
     type: 'signingDate',
+    next: 'borrowerDetails'
+  },
+
+  borrowerDetails: {
+    step_key: 'borrower_details',
+    route: '/m/standardBorrower/borrowerDetails',
+    key: 'borrower_details',
+    title: 'Entity and Individual Details',
+    type: 'borrowerDetails',
+    inlineActions: true,
     next: 'reviewSubmit'
   },
 

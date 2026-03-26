@@ -87,7 +87,7 @@ function mapPlaceToAddress(place) {
   const zip = findByType('postal_code')?.long_name || '';
   const addressLine1 = [streetNumber, route].filter(Boolean).join(' ').trim();
 
-  return {
+  return normalizeAddressValue({
     address_line_1: addressLine1,
     address_line_2: '',
     city,
@@ -95,7 +95,7 @@ function mapPlaceToAddress(place) {
     zip,
     full_address: place?.formatted_address || addressLine1,
     place_id: place?.place_id || ''
-  };
+  });
 }
 
 function getAddressFieldKey(step, field) {
@@ -147,21 +147,45 @@ function formatRate(value) {
   return `${safeValue.toFixed(2)}%`;
 }
 
+function extractStreetLine(fullAddress) {
+  const raw = String(fullAddress || '').trim();
+  if (!raw) return '';
+  return raw.split(',')[0]?.trim() || raw;
+}
+
+function normalizeAddressValue(addressValue) {
+  const next = { ...(addressValue || {}) };
+  const currentLine1 = String(next.address_line_1 || '').trim();
+  const fullAddress = String(next.full_address || '').trim();
+  const normalizedLine1 = extractStreetLine(currentLine1) || extractStreetLine(fullAddress);
+
+  return {
+    address_line_1: normalizedLine1,
+    address_line_2: String(next.address_line_2 || '').trim(),
+    city: String(next.city || '').trim(),
+    state: String(next.state || '').trim(),
+    zip: String(next.zip || '').trim(),
+    full_address: fullAddress,
+    place_id: String(next.place_id || '').trim()
+  };
+}
+
 function AddressAutocompleteField({ value, setValue }) {
   const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
   const autocompleteServiceRef = useRef(null);
   const placesServiceRef = useRef(null);
-  const [query, setQuery] = useState(value?.full_address || '');
+  const [query, setQuery] = useState(value?.address_line_1 || extractStreetLine(value?.full_address) || '');
   const [suggestions, setSuggestions] = useState([]);
   const [loading, setLoading] = useState(false);
   const [inputError, setInputError] = useState('');
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    if (value?.full_address && value.full_address !== query) {
-      setQuery(value.full_address);
+    const nextStreet = value?.address_line_1 || extractStreetLine(value?.full_address) || '';
+    if (nextStreet && nextStreet !== query) {
+      setQuery(nextStreet);
     }
-  }, [query, value?.full_address]);
+  }, [query, value?.address_line_1, value?.full_address]);
 
   useEffect(() => {
     let ignore = false;
@@ -237,7 +261,7 @@ function AddressAutocompleteField({ value, setValue }) {
 
         const mapped = mapPlaceToAddress(place);
         setValue(mapped);
-        setQuery(mapped.full_address || prediction.description || '');
+        setQuery(mapped.address_line_1 || prediction.structured_formatting?.main_text || prediction.description || '');
         setSuggestions([]);
       }
     );
@@ -254,12 +278,12 @@ function AddressAutocompleteField({ value, setValue }) {
             const nextQuery = event.target.value;
             setQuery(nextQuery);
             setValue({
-              address_line_1: '',
+              address_line_1: nextQuery,
               address_line_2: value?.address_line_2 || '',
               city: '',
               state: '',
               zip: '',
-              full_address: nextQuery,
+              full_address: '',
               place_id: ''
             });
           }}
@@ -531,6 +555,28 @@ function ReviewSubmitStep({ summary, onGoBack, onSubmit, submitting, submitError
   );
 }
 
+function EligibilityConfirmStep({ value, setValue }) {
+  const checked = Boolean(value?.non_owner_occupied);
+
+  return (
+    <div className="mt-6 max-w-[720px]">
+      <label className="flex items-center gap-3 rounded-lg border border-[#d6d9db] bg-[#f8f8f8] px-4 py-3 text-[16px] text-[#1f2937]">
+        <input
+          type="checkbox"
+          checked={checked}
+          onChange={(event) =>
+            setValue({
+              non_owner_occupied: event.target.checked
+            })
+          }
+          className="h-4 w-4 accent-[#2f54eb]"
+        />
+        <span>I will not be living in the property</span>
+      </label>
+    </div>
+  );
+}
+
 function getBorrowerDetailsDefault(step, answers) {
   const fallbackAddressLine1 = getAddressFieldValue(
     { addressPrefix: 'finance_property' },
@@ -565,7 +611,7 @@ function getBorrowerDetailsDefault(step, answers) {
     last_name: existing.last_name || answers.last_name || '',
     dob: existing.dob || answers.date_of_birth || '',
     address: {
-      address_line_1: existing.address?.address_line_1 || fallbackAddressLine1 || '',
+      address_line_1: extractStreetLine(existing.address?.address_line_1 || fallbackAddressLine1 || ''),
       address_line_2: existing.address?.address_line_2 || fallbackAddressLine2 || '',
       city: existing.address?.city || fallbackCity || '',
       state: existing.address?.state || fallbackState || '',
@@ -820,7 +866,7 @@ function getStepValue(step, answers) {
   }
 
   if (step.type === 'address') {
-    return {
+    const normalized = normalizeAddressValue({
       address_line_1: getAddressFieldValue(step, answers, 'address_line_1'),
       address_line_2: getAddressFieldValue(step, answers, 'address_line_2'),
       city: getAddressFieldValue(step, answers, 'city'),
@@ -828,6 +874,10 @@ function getStepValue(step, answers) {
       zip: getAddressFieldValue(step, answers, 'zip'),
       full_address: getAddressFieldValue(step, answers, 'full_address') || answers.property_address || '',
       place_id: getAddressFieldValue(step, answers, 'place_id')
+    });
+
+    return {
+      ...normalized
     };
   }
 
@@ -836,6 +886,25 @@ function getStepValue(step, answers) {
       return answers[step.key];
     }
     return getTodayIsoDate();
+  }
+
+  if (step.type === 'eligibilityConfirm') {
+    const saved = answers[step.key];
+    if (saved && typeof saved === 'object') {
+      return {
+        non_owner_occupied: Boolean(saved.non_owner_occupied)
+      };
+    }
+    return { non_owner_occupied: false };
+  }
+
+  if (step.type === 'eligibilityConfirm') {
+    return (
+      <EligibilityConfirmStep
+        value={value}
+        setValue={setValue}
+      />
+    );
   }
 
   if (step.type === 'borrowerDetails') {
@@ -1045,6 +1114,12 @@ export default function FunnelStepPage() {
       return Boolean(String(value?.place_id || '').trim());
     }
 
+    if (step.type === 'eligibilityConfirm') {
+      return {
+        non_owner_occupied: Boolean(value?.non_owner_occupied)
+      };
+    }
+
     if (step.type === 'borrowerDetails') {
       const hasIdentity = Boolean(
         String(value?.entity_name || '').trim()
@@ -1060,6 +1135,10 @@ export default function FunnelStepPage() {
       );
       const hasConsents = Boolean(value?.consents?.credit_pull && value?.consents?.background_check);
       return hasIdentity && hasAddress && hasConsents;
+    }
+
+    if (step.type === 'eligibilityConfirm') {
+      return Boolean(value?.non_owner_occupied);
     }
 
     if (step.type === 'reviewSubmit') {
@@ -1196,21 +1275,29 @@ export default function FunnelStepPage() {
     }
 
     if (step.type === 'address') {
-      setAnswer('address_line_1', nextValue?.address_line_1 || '');
-      setAnswer('address_line_2', nextValue?.address_line_2 || '');
-      setAnswer('city', nextValue?.city || '');
-      setAnswer('state', nextValue?.state || '');
-      setAnswer('zip', nextValue?.zip || '');
-      setAnswer('full_address', nextValue?.full_address || '');
-      setAnswer('place_id', nextValue?.place_id || '');
-      setAnswer(getAddressFieldKey(step, 'address_line_1'), nextValue?.address_line_1 || '');
-      setAnswer(getAddressFieldKey(step, 'address_line_2'), nextValue?.address_line_2 || '');
-      setAnswer(getAddressFieldKey(step, 'city'), nextValue?.city || '');
-      setAnswer(getAddressFieldKey(step, 'state'), nextValue?.state || '');
-      setAnswer(getAddressFieldKey(step, 'zip'), nextValue?.zip || '');
-      setAnswer(getAddressFieldKey(step, 'full_address'), nextValue?.full_address || '');
-      setAnswer(getAddressFieldKey(step, 'place_id'), nextValue?.place_id || '');
-      setAnswer('property_address', nextValue?.full_address || '');
+      const normalized = normalizeAddressValue(nextValue);
+      setAnswer('address_line_1', normalized.address_line_1 || '');
+      setAnswer('address_line_2', normalized.address_line_2 || '');
+      setAnswer('city', normalized.city || '');
+      setAnswer('state', normalized.state || '');
+      setAnswer('zip', normalized.zip || '');
+      setAnswer('full_address', normalized.full_address || '');
+      setAnswer('place_id', normalized.place_id || '');
+      setAnswer(getAddressFieldKey(step, 'address_line_1'), normalized.address_line_1 || '');
+      setAnswer(getAddressFieldKey(step, 'address_line_2'), normalized.address_line_2 || '');
+      setAnswer(getAddressFieldKey(step, 'city'), normalized.city || '');
+      setAnswer(getAddressFieldKey(step, 'state'), normalized.state || '');
+      setAnswer(getAddressFieldKey(step, 'zip'), normalized.zip || '');
+      setAnswer(getAddressFieldKey(step, 'full_address'), normalized.full_address || '');
+      setAnswer(getAddressFieldKey(step, 'place_id'), normalized.place_id || '');
+      setAnswer('property_address', normalized.full_address || '');
+      return;
+    }
+
+    if (step.type === 'eligibilityConfirm') {
+      setAnswer(step.key, {
+        non_owner_occupied: Boolean(nextValue?.non_owner_occupied)
+      });
       return;
     }
 
@@ -1244,7 +1331,7 @@ export default function FunnelStepPage() {
     }
 
     if (step.type === 'address') {
-      const baseAddress = {
+      const baseAddress = normalizeAddressValue({
         address_line_1: String(value?.address_line_1 || '').trim(),
         address_line_2: String(value?.address_line_2 || '').trim(),
         city: String(value?.city || '').trim(),
@@ -1252,7 +1339,7 @@ export default function FunnelStepPage() {
         zip: String(value?.zip || '').trim(),
         full_address: String(value?.full_address || '').trim(),
         place_id: String(value?.place_id || '').trim()
-      };
+      });
 
       if (!step.addressPrefix) {
         return baseAddress;
