@@ -578,28 +578,41 @@ function EligibilityConfirmStep({ value, setValue }) {
 }
 
 function getBorrowerDetailsDefault(step, answers) {
+  const fallbackAddressFromFull = extractStreetLine(
+    getAddressFieldValue({ addressPrefix: 'finance_property' }, answers, 'full_address')
+    || getAddressFieldValue({ addressPrefix: 'purchase_property' }, answers, 'full_address')
+    || getAddressFieldValue({ addressPrefix: 'lead_property' }, answers, 'full_address')
+    || answers.property_address
+  );
+
   const fallbackAddressLine1 = getAddressFieldValue(
     { addressPrefix: 'finance_property' },
     answers,
     'address_line_1'
-  ) || getAddressFieldValue({ addressPrefix: 'purchase_property' }, answers, 'address_line_1');
+  ) || getAddressFieldValue({ addressPrefix: 'purchase_property' }, answers, 'address_line_1')
+    || getAddressFieldValue({ addressPrefix: 'lead_property' }, answers, 'address_line_1')
+    || fallbackAddressFromFull;
 
   const fallbackAddressLine2 = getAddressFieldValue(
     { addressPrefix: 'finance_property' },
     answers,
     'address_line_2'
-  ) || getAddressFieldValue({ addressPrefix: 'purchase_property' }, answers, 'address_line_2');
+  ) || getAddressFieldValue({ addressPrefix: 'purchase_property' }, answers, 'address_line_2')
+    || getAddressFieldValue({ addressPrefix: 'lead_property' }, answers, 'address_line_2');
 
   const fallbackCity = getAddressFieldValue({ addressPrefix: 'finance_property' }, answers, 'city')
-    || getAddressFieldValue({ addressPrefix: 'purchase_property' }, answers, 'city');
+    || getAddressFieldValue({ addressPrefix: 'purchase_property' }, answers, 'city')
+    || getAddressFieldValue({ addressPrefix: 'lead_property' }, answers, 'city');
 
   const fallbackState = getAddressFieldValue({ addressPrefix: 'finance_property' }, answers, 'state')
     || getAddressFieldValue({ addressPrefix: 'purchase_property' }, answers, 'state')
+    || getAddressFieldValue({ addressPrefix: 'lead_property' }, answers, 'state')
     || answers.property_state
     || '';
 
   const fallbackZip = getAddressFieldValue({ addressPrefix: 'finance_property' }, answers, 'zip')
-    || getAddressFieldValue({ addressPrefix: 'purchase_property' }, answers, 'zip');
+    || getAddressFieldValue({ addressPrefix: 'purchase_property' }, answers, 'zip')
+    || getAddressFieldValue({ addressPrefix: 'lead_property' }, answers, 'zip');
 
   const existing = step.key && answers[step.key] && typeof answers[step.key] === 'object'
     ? answers[step.key]
@@ -695,15 +708,15 @@ function BorrowerDetailsStep({
 
   return (
     <div className="mt-4">
-      <p className="max-w-[980px] text-[34px] leading-[1.25] text-[#1f2937]">
+      <p className="max-w-[980px] text-[24px] leading-[1.35] text-[#1f2937]">
         In order to provide you the best possible rate, we will run a soft credit pull on the guarantor
         of the entity. Here is what we have so far.
       </p>
 
       <div className="mt-8 grid grid-cols-1 gap-8 xl:grid-cols-[1.05fr_0.95fr]">
         <section>
-          <h2 className="text-[48px] font-medium leading-tight text-[#1f2937]">Entity and Individual Details</h2>
-          <p className="mt-3 text-[18px] leading-7 text-[#4b5563]">
+          <h2 className="text-[24px] font-semibold leading-tight text-[#1f2937]">Entity and Individual Details</h2>
+          <p className="mt-2 text-[14px] leading-6 text-[#4b5563]">
             Here is the most up to date information we have. Please enter or confirm any additional details.
           </p>
 
@@ -786,8 +799,8 @@ function BorrowerDetailsStep({
         </section>
 
         <aside className="border border-[#d6d9db] bg-[#f8f8f8] p-6">
-          <h3 className="text-[46px] font-medium leading-tight text-[#1f2937]">Submission Details</h3>
-          <p className="mt-3 text-[18px] leading-7 text-[#4b5563]">
+          <h3 className="text-[24px] font-semibold leading-tight text-[#1f2937]">Submission Details</h3>
+          <p className="mt-2 text-[14px] leading-6 text-[#4b5563]">
             You can download Loan Terms now. Submit the loan application when you're ready.
           </p>
 
@@ -801,8 +814,8 @@ function BorrowerDetailsStep({
           </button>
           {downloadError ? <p className="mt-2 text-sm text-[#b63d3d]">{downloadError}</p> : null}
 
-          <h4 className="mt-8 text-[34px] font-semibold text-[#1f2937]">About This Application</h4>
-          <ul className="mt-3 list-disc space-y-2 pl-5 text-[18px] leading-8 text-[#374151]">
+          <h4 className="mt-7 text-[18px] font-semibold text-[#1f2937]">About This Application</h4>
+          <ul className="mt-2 list-disc space-y-1.5 pl-5 text-[14px] leading-7 text-[#374151]">
             <li>If you've recently applied for another loan with us, we will use the credit decision on file.</li>
             <li>To ensure the most accurate pricing, we recommend the guarantor submit the loan application.</li>
             <li>This guarantor must have owned at least 25% of this entity for at least 180 days or since inception.</li>
@@ -810,9 +823,9 @@ function BorrowerDetailsStep({
             <li>If you need to change entities for this loan application please contact support.</li>
           </ul>
 
-          <p className="mt-6 text-[28px] font-medium text-[#1f2937]">I consent to have this lender:</p>
+          <p className="mt-5 text-[18px] font-semibold text-[#1f2937]">I consent to have this lender:</p>
           <div className="mt-4 space-y-4">
-            <label className="flex items-start gap-3 text-[18px] leading-7 text-[#374151]">
+            <label className="flex items-start gap-3 text-[14px] leading-6 text-[#374151]">
               <input
                 type="checkbox"
                 checked={Boolean(value.consents?.credit_pull)}
@@ -821,7 +834,7 @@ function BorrowerDetailsStep({
               />
               <span>Order a consumer credit report (soft pull)</span>
             </label>
-            <label className="flex items-start gap-3 text-[18px] leading-7 text-[#374151]">
+            <label className="flex items-start gap-3 text-[14px] leading-6 text-[#374151]">
               <input
                 type="checkbox"
                 checked={Boolean(value.consents?.background_check)}
@@ -838,7 +851,7 @@ function BorrowerDetailsStep({
             <button
               type="button"
               onClick={onGoBack}
-              className="text-[18px] font-medium text-[#0f766e] underline underline-offset-2 hover:text-[#0d5f59]"
+              className="text-[14px] font-medium text-[#0f766e] underline underline-offset-2 hover:text-[#0d5f59]"
             >
               Go Back
             </button>
@@ -896,15 +909,6 @@ function getStepValue(step, answers) {
       };
     }
     return { non_owner_occupied: false };
-  }
-
-  if (step.type === 'eligibilityConfirm') {
-    return (
-      <EligibilityConfirmStep
-        value={value}
-        setValue={setValue}
-      />
-    );
   }
 
   if (step.type === 'borrowerDetails') {
@@ -1028,6 +1032,15 @@ function StepRenderer({
     );
   }
 
+  if (step.type === 'eligibilityConfirm') {
+    return (
+      <EligibilityConfirmStep
+        value={value}
+        setValue={setValue}
+      />
+    );
+  }
+
   if (step.type === 'borrowerDetails') {
     return (
       <BorrowerDetailsStep
@@ -1125,7 +1138,6 @@ export default function FunnelStepPage() {
         String(value?.entity_name || '').trim()
         && String(value?.first_name || '').trim()
         && String(value?.last_name || '').trim()
-        && String(value?.dob || '').trim()
       );
       const hasAddress = Boolean(
         String(value?.address?.address_line_1 || '').trim()
@@ -1133,8 +1145,7 @@ export default function FunnelStepPage() {
         && String(value?.address?.state || '').trim()
         && String(value?.address?.zip || '').trim()
       );
-      const hasConsents = Boolean(value?.consents?.credit_pull && value?.consents?.background_check);
-      return hasIdentity && hasAddress && hasConsents;
+      return hasIdentity && hasAddress;
     }
 
     if (step.type === 'eligibilityConfirm') {
@@ -1601,7 +1612,7 @@ export default function FunnelStepPage() {
                   {saving ? 'Saving...' : 'Next'}
                 </button>
               </div>
-            ) : step.type === 'reviewSubmit' ? null : (
+            ) : step.type === 'reviewSubmit' || step.type === 'borrowerDetails' ? null : (
               <div className="mt-6 max-w-[460px] rounded-md border border-[#cfd8ff] bg-[#eef2ff] p-3 text-center text-sm font-semibold text-[#1f3aa0]">
                 Funnel complete
               </div>
