@@ -25,12 +25,6 @@ function parseCurrencyInput(value) {
   return Number.isFinite(numeric) ? numeric : 0;
 }
 
-function toPercentDisplay(value) {
-  const numeric = Number(value);
-  if (!Number.isFinite(numeric)) return '';
-  return numeric > 0 && numeric <= 1 ? String(numeric * 100) : String(numeric);
-}
-
 export default function RateCalculatorPage() {
   const apiBaseUrl = getApiBaseUrl();
   const navigate = useNavigate();
@@ -43,17 +37,15 @@ export default function RateCalculatorPage() {
   const [error, setError] = useState('');
   const [metrics, setMetrics] = useState(null);
   const [form, setForm] = useState({
-    property_state: '',
+    property_state: 'FL',
     est_fico: '700-739',
     refinance: 'no',
+    owned_six_months: 'yes',
     property_rehab: 'yes',
-    purchase_price: '$60,000',
-    purchase_loan_amount: '$45,000',
+    purchase_price: '$160,000',
+    purchase_loan_amount: '$110,000',
     rehab_budget: '$60,000',
-    purchase_advance_percent: '75',
-    rehab_advance_percent: '100',
-    comp_value: '$250,000',
-    rehab_factor: '0.6'
+    comp_value: '$300,000'
   });
 
   useEffect(() => {
@@ -77,30 +69,24 @@ export default function RateCalculatorPage() {
             prev.property_state,
           est_fico: data.est_fico || prev.est_fico,
           refinance: data.refinance || prev.refinance,
+          owned_six_months: data.owned_six_months || prev.owned_six_months,
           property_rehab: data.property_rehab || prev.property_rehab,
           purchase_price:
             data.purchase_price !== undefined
               ? formatCurrencyInput(data.purchase_price)
               : prev.purchase_price,
           purchase_loan_amount:
-            data.purchase_loan !== undefined
-              ? formatCurrencyInput(data.purchase_loan)
+            (data.loan_amount !== undefined || data.purchase_loan !== undefined)
+              ? formatCurrencyInput(data.loan_amount ?? data.purchase_loan)
               : prev.purchase_loan_amount,
           rehab_budget:
-            data.rehab_budget !== undefined
-              ? formatCurrencyInput(data.rehab_budget)
+            (data.rehab_cost !== undefined || data.rehab_budget !== undefined)
+              ? formatCurrencyInput(data.rehab_cost ?? data.rehab_budget)
               : prev.rehab_budget,
-          purchase_advance_percent: data.purchase_advance_percent !== undefined
-            ? toPercentDisplay(data.purchase_advance_percent)
-            : prev.purchase_advance_percent,
-          rehab_advance_percent: data.rehab_advance_percent !== undefined
-            ? toPercentDisplay(data.rehab_advance_percent)
-            : prev.rehab_advance_percent,
           comp_value:
-            data.comp_value !== undefined
-              ? formatCurrencyInput(data.comp_value)
+            (data.arv !== undefined || data.comp_value !== undefined)
+              ? formatCurrencyInput(data.arv ?? data.comp_value)
               : prev.comp_value,
-          rehab_factor: data.rehab_factor ?? prev.rehab_factor
         }));
       } catch (_loadError) {
         if (!ignore) {
@@ -131,14 +117,15 @@ export default function RateCalculatorPage() {
       setError('');
       try {
         const result = await calculateLoan(apiBaseUrl, {
+          fico_bucket: form.est_fico,
+          est_fico: form.est_fico,
+          refinance: form.refinance,
+          owned_six_months: form.owned_six_months,
+          property_rehab: form.property_rehab,
           purchase_price: parseCurrencyInput(form.purchase_price),
-          purchase_loan: parseCurrencyInput(form.purchase_loan_amount),
-          rehab_budget: parseCurrencyInput(form.rehab_budget),
-          current_value: parseCurrencyInput(form.purchase_price),
-          comp_value: parseCurrencyInput(form.comp_value),
-          purchase_advance_percent: Number(form.purchase_advance_percent || 0),
-          rehab_advance_percent: form.property_rehab === 'yes' ? Number(form.rehab_advance_percent || 0) : 0,
-          rehab_factor: Number(form.rehab_factor || 0)
+          loan_amount: parseCurrencyInput(form.purchase_loan_amount),
+          rehab_cost: form.property_rehab === 'yes' ? parseCurrencyInput(form.rehab_budget) : 0,
+          arv: parseCurrencyInput(form.comp_value)
         });
         if (!ignore) {
           setMetrics(result);
@@ -164,9 +151,9 @@ export default function RateCalculatorPage() {
     form.purchase_loan_amount,
     form.rehab_budget,
     form.comp_value,
-    form.purchase_advance_percent,
-    form.rehab_advance_percent,
-    form.rehab_factor,
+    form.refinance,
+    form.owned_six_months,
+    form.est_fico,
     form.property_rehab
   ]);
 
@@ -177,7 +164,7 @@ export default function RateCalculatorPage() {
     setForm((prev) => ({
       ...prev,
       ...(field === 'property_rehab' && value === 'no'
-        ? { rehab_advance_percent: '0', rehab_budget: '$0' }
+        ? { rehab_budget: '$0' }
         : {}),
       [field]: nextValue
     }));
@@ -193,8 +180,6 @@ export default function RateCalculatorPage() {
       const purchaseLoanAmount = parseCurrencyInput(form.purchase_loan_amount);
       const rehabBudget = parseCurrencyInput(form.rehab_budget);
       const compValue = parseCurrencyInput(form.comp_value);
-      const purchaseAdvancePercent = Number(form.purchase_advance_percent || 0);
-      const rehabAdvancePercent = form.property_rehab === 'yes' ? Number(form.rehab_advance_percent || 0) : 0;
 
       await saveApplicationStep(apiBaseUrl, effectiveApplicationId, 'selected_loan_product', {
         term: product.term,
@@ -209,14 +194,15 @@ export default function RateCalculatorPage() {
         property_state: form.property_state,
         est_fico: form.est_fico,
         refinance: form.refinance,
+        owned_six_months: form.owned_six_months,
         property_rehab: form.property_rehab,
         purchase_price: purchasePrice,
+        loan_amount: purchaseLoanAmount,
         purchase_loan: purchaseLoanAmount,
+        rehab_cost: rehabBudget,
         rehab_budget: rehabBudget,
-        comp_value: compValue,
-        purchase_advance_percent: purchaseAdvancePercent,
-        rehab_advance_percent: rehabAdvancePercent,
-        rehab_factor: Number(form.rehab_factor || 0)
+        arv: compValue,
+        comp_value: compValue
       });
 
       await saveApplicationStep(apiBaseUrl, effectiveApplicationId, 'calculator_results', {

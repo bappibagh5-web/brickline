@@ -1,118 +1,189 @@
-function toNumber(value, fieldName) {
-  const parsed = Number(value);
-  if (!Number.isFinite(parsed)) {
-    throw new Error(`${fieldName} must be a valid number.`);
-  }
-  return parsed;
+const ELIGIBILITY_POLICY = [
+  { fico: 'Below 600', maxLTC: 0.8, maxLTARV: 0.7, ficoTooLow: true },
+  { fico: '600-619', maxLTC: 0.85, maxLTARV: 0.7, ficoTooLow: false },
+  { fico: '620-639', maxLTC: 0.8, maxLTARV: 0.7, ficoTooLow: true },
+  { fico: '640-659', maxLTC: 0.8, maxLTARV: 0.7, ficoTooLow: false },
+  { fico: '660-679', maxLTC: 0.85, maxLTARV: 0.7, ficoTooLow: false },
+  { fico: '680-699', maxLTC: 0.85, maxLTARV: 0.7, ficoTooLow: false },
+  { fico: '700-719', maxLTC: 0.9, maxLTARV: 0.75, ficoTooLow: false },
+  { fico: '720-739', maxLTC: 0.9, maxLTARV: 0.75, ficoTooLow: false },
+  { fico: '740-759', maxLTC: 0.9, maxLTARV: 0.75, ficoTooLow: false },
+  { fico: '760-779', maxLTC: 0.9, maxLTARV: 0.75, ficoTooLow: false },
+  { fico: 'Over 780', maxLTC: 0.9, maxLTARV: 0.75, ficoTooLow: false }
+];
+
+const FICO_PRICING_BUCKET_MAP = {
+  '640-659': 'bucketA',
+  '660-679': 'bucketB',
+  '680-699': 'bucketB',
+  '700-719': 'bucketC',
+  '720-739': 'bucketC',
+  '740-759': 'bucketC',
+  '760-779': 'bucketD',
+  'Over 780': 'bucketD'
+};
+
+const BASE_RATE_12_MONTH = {
+  bucketA: { band1: 11.45, band2: 11.45, band3: 11.45 },
+  bucketB: { band1: 9.5, band2: 10.5, band3: 11.5 },
+  bucketC: { band1: 8.95, band2: 9.95, band3: 10.95 },
+  bucketD: { band1: 8.75, band2: 9.5, band3: 10.5 }
+};
+
+const TERM_SPREADS = {
+  12: 0,
+  18: 0.75,
+  24: 1
+};
+const REFI_OWNED_SIX_MONTHS_DISCOUNT = 0.25;
+
+const MIN_DISPLAY_LOAN = 40000;
+const MIN_LOAN_AMOUNT = 100000;
+
+function toNumber(value, fallback = 0) {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : fallback;
 }
 
 function roundMoney(value) {
-  return Number(value.toFixed(2));
+  return Number(toNumber(value, 0).toFixed(2));
 }
 
 function roundPercent(value) {
-  return Number((value * 100).toFixed(2));
+  return Number((toNumber(value, 0) * 100).toFixed(2));
 }
 
-function normalizePercent(value) {
-  if (value === null || value === undefined) return 0;
-  const num = Number(value);
-  return num > 1 ? num / 100 : num;
+function getPolicy(fico) {
+  return ELIGIBILITY_POLICY.find((item) => item.fico === fico) || ELIGIBILITY_POLICY[0];
 }
 
-const MAX_LTARV = 0.75;
-const LOAN_PRODUCTS = [
-  { term: 12, rate: 8.5 },
-  { term: 18, rate: 9.2 },
-  { term: 24, rate: 9.8 }
-];
+function getLeverageBand(ltcDecimal) {
+  if (ltcDecimal <= 0.75) return 'band1';
+  if (ltcDecimal < 0.8) return 'band2';
+  return 'band3';
+}
 
-function clamp(value, min, max) {
-  return Math.max(min, Math.min(max, value));
+function getLoanAmount(input) {
+  return toNumber(
+    input.loan_amount
+    ?? input.purchase_loan
+    ?? input.refinance_loan
+    ?? input.purchase_loan_amount
+    ?? 0,
+    0
+  );
+}
+
+function getRehabCost(input) {
+  const rehabEnabled = String(input.property_rehab ?? input.rehab_enabled ?? 'yes').toLowerCase() !== 'no';
+  if (!rehabEnabled) return 0;
+  return toNumber(input.rehab_cost ?? input.rehab_budget ?? 0, 0);
+}
+
+function getArv(input) {
+  return toNumber(input.arv ?? input.comp_value ?? 0, 0);
+}
+
+function isAffirmative(value) {
+  if (typeof value === 'boolean') return value;
+  return String(value).toLowerCase() === 'yes' || String(value).toLowerCase() === 'true';
+}
+
+function getPricingOptions(input, loanAmount, ltcDecimal, isEligible) {
+  if (!isEligible) return [];
+
+  const fico = input.fico_bucket ?? input.est_fico ?? input.fico;
+  const bucket = FICO_PRICING_BUCKET_MAP[fico];
+  if (!bucket) return [];
+
+  const band = getLeverageBand(ltcDecimal);
+  let base12 = BASE_RATE_12_MONTH[bucket]?.[band];
+  if (!Number.isFinite(base12)) return [];
+
+  const refinanceEnabled = isAffirmative(input.refinance);
+  const ownedSixMonths = isAffirmative(input.owned_six_months);
+  if (refinanceEnabled && ownedSixMonths) {
+    base12 = Math.max(0, base12 - REFI_OWNED_SIX_MONTHS_DISCOUNT);
+  }
+
+  return [12, 18, 24].map((term) => {
+    const rate = Number((base12 + TERM_SPREADS[term]).toFixed(3));
+    const monthlyPayment = roundMoney((loanAmount * (rate / 100)) / 12);
+    return {
+      term,
+      rate,
+      monthly_payment: monthlyPayment
+    };
+  });
 }
 
 function calculateLoanMetrics(input) {
-  const purchasePrice = toNumber(input.purchase_price, 'purchase_price');
-  const rehabBudget = toNumber(input.rehab_budget, 'rehab_budget');
-  const purchaseAdvanceRaw = toNumber(input.purchase_advance_percent, 'purchase_advance_percent');
-  const rehabAdvanceRaw = toNumber(input.rehab_advance_percent, 'rehab_advance_percent');
-  const purchaseAdvance = normalizePercent(purchaseAdvanceRaw);
-  const rehabAdvance = normalizePercent(rehabAdvanceRaw);
-  const currentValue = toNumber(input.current_value, 'current_value');
-  const compValue = toNumber(input.comp_value, 'comp_value');
-  const rehabFactor = toNumber(input.rehab_factor, 'rehab_factor');
-  const manualPurchaseLoan =
-    input.purchase_loan !== undefined && input.purchase_loan !== null && input.purchase_loan !== ''
-      ? toNumber(input.purchase_loan, 'purchase_loan')
-      : null;
+  const fico = input.fico_bucket ?? input.est_fico ?? input.fico ?? 'Below 600';
+  const policy = getPolicy(fico);
 
-  const purchaseLoan = manualPurchaseLoan !== null ? manualPurchaseLoan : (purchasePrice * purchaseAdvance);
-  const rehabLoan = rehabBudget * rehabAdvance;
-  if (purchaseLoan > purchasePrice) {
-    throw new Error('Invalid percentage normalization: purchase_loan cannot exceed purchase_price.');
-  }
-  const totalLoan = purchaseLoan + rehabLoan;
-  const totalCost = purchasePrice + rehabBudget;
-  const arv = 0.75 * compValue + 0.25 * (currentValue + rehabBudget * rehabFactor);
-  const ltc = totalCost === 0 ? 0 : totalLoan / totalCost;
-  const ltarv = arv === 0 ? 0 : totalLoan / arv;
+  const purchasePrice = toNumber(input.purchase_price, 0);
+  const loanAmount = getLoanAmount(input);
+  const rehabCost = getRehabCost(input);
+  const arv = getArv(input);
+
+  const totalLoan = loanAmount + rehabCost;
+  const totalCost = purchasePrice + rehabCost;
+  const ltcDecimal = purchasePrice > 0 ? loanAmount / purchasePrice : 0;
+  const ltarvDecimal = arv > 0 ? totalLoan / arv : 0;
   const spread = arv - totalLoan;
-  const maxLoanBasedOnArv = arv * MAX_LTARV;
-  const minLoanBasedOnArv = maxLoanBasedOnArv * 0.8;
-  const goodSpreadThreshold = arv * 0.15;
-  const lowSpreadThreshold = arv * 0.1;
 
-  let dealRating = 'risky';
-  if (ltarv <= 75 && spread >= goodSpreadThreshold) {
-    dealRating = 'good';
-  } else if (ltarv <= 85) {
-    dealRating = 'medium';
-  }
+  const qualifiedMaxLoanDecimal = Math.max(
+    0,
+    Math.min(
+      purchasePrice * policy.maxLTC,
+      (arv * policy.maxLTARV) - rehabCost
+    )
+  );
 
-  const riskFlags = [];
-  if (ltarv > 75) {
-    riskFlags.push('High leverage (LTARV above 75%)');
-  }
-  if (ltc > 85) {
-    riskFlags.push('High loan-to-cost ratio');
-  }
-  if (spread < lowSpreadThreshold) {
-    riskFlags.push('Low equity spread');
+  const errors = [];
+
+  if (ltarvDecimal > policy.maxLTARV) {
+    errors.push(
+      `Either decrease Loan Amount Requested or increase the After Repair Value. After-Repair-Value Loan-to-Value (ARV LTV) is ${roundPercent(ltarvDecimal)}%, but must be no more than ${roundPercent(policy.maxLTARV)}%`
+    );
   }
 
-  let confidenceScore = 100;
-  if (ltarv > 75) {
-    confidenceScore -= 10;
+  if (ltcDecimal > policy.maxLTC) {
+    errors.push(
+      `Reduce either Purchase Price or Initial Loan Amount. Loan-To-Cost (LTC) is ${roundPercent(ltcDecimal)}%, but must be no more than ${roundPercent(policy.maxLTC)}%`
+    );
   }
-  if (ltc > 85) {
-    confidenceScore -= 10;
-  }
-  if (spread < lowSpreadThreshold) {
-    confidenceScore -= 10;
-  }
-  confidenceScore = clamp(confidenceScore, 0, 100);
 
-  const loanProducts = LOAN_PRODUCTS.map((product) => ({
-    term: product.term,
-    rate: product.rate,
-    monthly_payment: roundMoney((totalLoan * (product.rate / 100)) / 12)
-  }));
+  if ((purchasePrice + rehabCost) > arv && arv > 0) {
+    errors.push('Adjust your Rehab Amount. Based on ARV and cost, the rehab cost is too high.');
+  }
+
+  if (policy.ficoTooLow) {
+    errors.push("Applicant's FICO score is too low");
+  }
+
+  if (loanAmount < MIN_LOAN_AMOUNT) {
+    errors.push('Minimum loan amount is $100,000');
+  }
+
+  const isEligible = errors.length === 0;
+  const loanProducts = getPricingOptions(input, loanAmount, ltcDecimal, isEligible);
 
   return {
-    purchase_loan: roundMoney(purchaseLoan),
-    rehab_loan: roundMoney(rehabLoan),
+    fico_policy: policy.fico,
+    is_eligible: isEligible,
+    errors,
+    purchase_loan: roundMoney(loanAmount),
+    rehab_loan: roundMoney(rehabCost),
     total_loan: roundMoney(totalLoan),
     total_cost: roundMoney(totalCost),
     arv: roundMoney(arv),
-    ltc: roundPercent(ltc),
-    ltarv: roundPercent(ltarv),
+    ltc: roundPercent(ltcDecimal),
+    ltarv: roundPercent(ltarvDecimal),
     spread: roundMoney(spread),
-    min_loan: roundMoney(minLoanBasedOnArv),
-    max_loan: roundMoney(maxLoanBasedOnArv),
-    loan_products: loanProducts,
-    deal_rating: dealRating,
-    risk_flags: riskFlags,
-    confidence_score: Number(confidenceScore.toFixed(2))
+    min_loan: roundMoney(MIN_DISPLAY_LOAN),
+    max_loan: roundMoney(qualifiedMaxLoanDecimal),
+    loan_products: loanProducts
   };
 }
 

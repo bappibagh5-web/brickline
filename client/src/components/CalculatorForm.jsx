@@ -22,6 +22,20 @@ const US_STATE_OPTIONS = [
   'DC'
 ];
 
+const FICO_OPTIONS = [
+  'Below 600',
+  '600-619',
+  '620-639',
+  '640-659',
+  '660-679',
+  '680-699',
+  '700-719',
+  '720-739',
+  '740-759',
+  '760-779',
+  'Over 780'
+];
+
 function FieldLabel({ children }) {
   return <span className="text-sm font-medium text-[#374151]">{children}</span>;
 }
@@ -67,10 +81,11 @@ export default function CalculatorForm({
             className={inputClass}
           >
             <option value="">Select</option>
-            <option value="620-659">620-659</option>
-            <option value="660-699">660-699</option>
-            <option value="700-739">700-739</option>
-            <option value="740+">740+</option>
+            {FICO_OPTIONS.map((ficoOption) => (
+              <option key={ficoOption} value={ficoOption}>
+                {ficoOption}
+              </option>
+            ))}
           </select>
         </label>
       </div>
@@ -87,6 +102,19 @@ export default function CalculatorForm({
             <option value="yes">Yes</option>
           </select>
         </label>
+        {form.refinance === 'yes' ? (
+          <label className="grid gap-1.5">
+            <FieldLabel>Prop. Owned ≥ 6 Months</FieldLabel>
+            <select
+              value={form.owned_six_months}
+              onChange={(event) => onFormChange('owned_six_months', event.target.value)}
+              className={inputClass}
+            >
+              <option value="yes">Yes</option>
+              <option value="no">No</option>
+            </select>
+          </label>
+        ) : null}
         <label className="grid gap-1.5">
           <FieldLabel>Purchase Price</FieldLabel>
           <input
@@ -97,7 +125,7 @@ export default function CalculatorForm({
           />
         </label>
         <label className="grid gap-1.5">
-          <FieldLabel>Purchase Loan Amount</FieldLabel>
+          <FieldLabel>{form.refinance === 'yes' ? 'Refinance Loan Amount' : 'Purchase Loan Amount'}</FieldLabel>
           <input
             type="text"
             value={form.purchase_loan_amount}

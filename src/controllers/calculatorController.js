@@ -11,16 +11,22 @@ async function calculate(req, res, next) {
     const body = req.body || {};
 
     const requiredFields = [
-      'purchase_price',
-      'rehab_budget',
-      'purchase_advance_percent',
-      'rehab_advance_percent',
-      'current_value',
-      'comp_value',
-      'rehab_factor'
+      { name: 'purchase_price', aliases: ['purchase_price'] },
+      { name: 'loan_amount', aliases: ['loan_amount', 'purchase_loan', 'purchase_loan_amount', 'refinance_loan'] },
+      { name: 'arv', aliases: ['arv', 'comp_value'] }
     ];
 
-    const missing = requiredFields.filter((field) => body[field] === undefined || body[field] === null || body[field] === '');
+    const missing = requiredFields
+      .filter((field) => !field.aliases.some((alias) => body[alias] !== undefined && body[alias] !== null && body[alias] !== ''))
+      .map((field) => field.name);
+
+    if ((body.property_rehab ?? 'yes') !== 'no') {
+      const hasRehabCost = ['rehab_cost', 'rehab_budget'].some((alias) => body[alias] !== undefined && body[alias] !== null && body[alias] !== '');
+      if (!hasRehabCost) {
+        missing.push('rehab_cost');
+      }
+    }
+
     if (missing.length > 0) {
       throw createHttpError(400, `Missing required fields: ${missing.join(', ')}`);
     }

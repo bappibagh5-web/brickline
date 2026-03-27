@@ -39,15 +39,34 @@ export default function CalculatorResults({
   }
 
   const products = Array.isArray(metrics?.loan_products) ? metrics.loan_products : [];
+  const errors = Array.isArray(metrics?.errors) ? metrics.errors : [];
+  const hasMetrics = Boolean(metrics);
+  const isEligible = Boolean(metrics?.is_eligible);
   const lowestRate = products.length > 0
     ? Math.min(...products.map((p) => Number(p.rate)))
     : null;
 
   return (
     <section className="mt-1">
+      {errors.length > 0 ? (
+        <div className="mb-3 rounded-md border border-[#ef4444] bg-[#fef2f2] px-4 py-3">
+          <p className="text-sm font-semibold text-[#b91c1c]">Please fix the following</p>
+          <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-[#b91c1c]">
+            {errors.map((error) => (
+              <li key={error}>{error}</li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
       <p className="mb-2 text-base text-[#4b5563]">
         Based on your provided information, you've qualified for the following options:
       </p>
+      {hasMetrics && !isEligible ? (
+        <div className="rounded-md border border-[#e5e7eb] bg-white px-4 py-5">
+          <p className="text-base font-semibold text-[#1f2937]">No Loans Available</p>
+          <p className="mt-1 text-sm text-[#6b7280]">Adjust your information to see more.</p>
+        </div>
+      ) : null}
       <div className="space-y-1.5">
         {products.map((product) => {
           const isLowestRate = Number(product.rate) === lowestRate;
@@ -70,7 +89,7 @@ export default function CalculatorResults({
                 </div>
                 <div>
                   <p className="text-xs text-[#6b7280]">Rate</p>
-                  <p className="text-[18px] font-semibold leading-tight text-[#1f2937]">{formatPercent(product.rate)}</p>
+                  <p className="text-[18px] font-semibold leading-tight text-[#1f2937]">{Number(product.rate).toFixed(3)}%</p>
                 </div>
                 <div>
                   <p className="text-xs text-[#6b7280]">Est. Monthly Payment</p>
