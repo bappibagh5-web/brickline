@@ -20,8 +20,6 @@ const US_STATES = [
   'VA', 'WA', 'WV', 'WI', 'WY'
 ];
 
-const GOOGLE_SCRIPT_ID = 'brickline-google-places-script';
-
 function buildApiBaseCandidates(primaryBase) {
   const bases = new Set();
   const normalized = String(primaryBase || '').trim().replace(/\/+$/, '');
@@ -41,62 +39,6 @@ function buildApiBaseCandidates(primaryBase) {
   }
 
   return Array.from(bases);
-}
-
-function loadGooglePlacesScript(apiKey) {
-  return new Promise((resolve, reject) => {
-    if (!apiKey) {
-      reject(new Error('Missing VITE_GOOGLE_MAPS_API_KEY.'));
-      return;
-    }
-
-    if (window.google?.maps?.places) {
-      resolve(window.google);
-      return;
-    }
-
-    const existing = document.getElementById(GOOGLE_SCRIPT_ID);
-    if (existing) {
-      existing.addEventListener('load', () => resolve(window.google));
-      existing.addEventListener('error', () => reject(new Error('Failed to load Google Places script.')));
-      return;
-    }
-
-    const script = document.createElement('script');
-    script.id = GOOGLE_SCRIPT_ID;
-    script.async = true;
-    script.defer = true;
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`;
-    script.onload = () => resolve(window.google);
-    script.onerror = () => reject(new Error('Failed to load Google Places script.'));
-    document.head.appendChild(script);
-  });
-}
-
-function mapPlaceToAddress(place) {
-  const components = Array.isArray(place?.address_components) ? place.address_components : [];
-  const findByType = (type) => components.find((component) => component.types?.includes(type));
-
-  const streetNumber = findByType('street_number')?.long_name || '';
-  const route = findByType('route')?.long_name || '';
-  const city =
-    findByType('locality')?.long_name ||
-    findByType('postal_town')?.long_name ||
-    findByType('sublocality')?.long_name ||
-    '';
-  const state = findByType('administrative_area_level_1')?.short_name || '';
-  const zip = findByType('postal_code')?.long_name || '';
-  const addressLine1 = [streetNumber, route].filter(Boolean).join(' ').trim();
-
-  return normalizeAddressValue({
-    address_line_1: addressLine1,
-    address_line_2: '',
-    city,
-    state,
-    zip,
-    full_address: place?.formatted_address || addressLine1,
-    place_id: place?.place_id || ''
-  });
 }
 
 function getAddressFieldKey(step, field) {
@@ -171,15 +113,12 @@ function normalizeAddressValue(addressValue) {
   };
 }
 
-function AddressAutocompleteField({ value, setValue }) {
-  const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
-  const autocompleteServiceRef = useRef(null);
-  const placesServiceRef = useRef(null);
+function AddressAutocompleteField({ value, setValue, apiBaseUrl }) {
+  const requestIdRef = useRef(0);
   const [query, setQuery] = useState(value?.address_line_1 || extractStreetLine(value?.full_address) || '');
   const [suggestions, setSuggestions] = useState([]);
   const [loading, setLoading] = useState(false);
   const [inputError, setInputError] = useState('');
-  const [ready, setReady] = useState(false);
 
   useEffect(() => {
     const nextStreet = value?.address_line_1 || extractStreetLine(value?.full_address) || '';
@@ -189,27 +128,6 @@ function AddressAutocompleteField({ value, setValue }) {
   }, [query, value?.address_line_1, value?.full_address]);
 
   useEffect(() => {
-    let ignore = false;
-    loadGooglePlacesScript(apiKey)
-      .then((google) => {
-        if (ignore) return;
-        autocompleteServiceRef.current = new google.maps.places.AutocompleteService();
-        placesServiceRef.current = new google.maps.places.PlacesService(document.createElement('div'));
-        setReady(true);
-      })
-      .catch((error) => {
-        if (ignore) return;
-        setInputError(error.message || 'Google Places failed to load.');
-      });
-
-    return () => {
-      ignore = true;
-    };
-  }, [apiKey]);
-
-  useEffect(() => {
-    if (!ready || !autocompleteServiceRef.current) return;
-
     const input = String(query || '').trim();
     if (input.length < 3) {
       setSuggestions([]);
@@ -219,53 +137,58 @@ function AddressAutocompleteField({ value, setValue }) {
 
     setLoading(true);
     setInputError('');
+    const currentRequestId = ++requestIdRef.current;
     const timer = setTimeout(() => {
-      autocompleteServiceRef.current.getPlacePredictions(
-        {
-          input,
-          types: ['address'],
-          componentRestrictions: { country: 'us' }
-        },
-        (predictions, status) => {
-          setLoading(false);
-          const okStatus = window.google?.maps?.places?.PlacesServiceStatus?.OK;
-          if (status !== okStatus || !Array.isArray(predictions)) {
-            setSuggestions([]);
-            return;
+      fetch(`${apiBaseUrl}/places/autocomplete?input=${encodeURIComponent(input)}`)
+        .then(async (response) => {
+          const payload = await response.json().catch(() => ({}));
+          if (!response.ok) {
+            throw new Error(payload?.error || 'Failed to fetch address suggestions.');
           }
-          setSuggestions(predictions);
-        }
-      );
+          return payload;
+        })
+        .then((payload) => {
+          if (currentRequestId !== requestIdRef.current) return;
+          setLoading(false);
+          const nextSuggestions = Array.isArray(payload?.predictions) ? payload.predictions : [];
+          setSuggestions(nextSuggestions);
+        })
+        .catch((error) => {
+          if (currentRequestId !== requestIdRef.current) return;
+          setLoading(false);
+          setSuggestions([]);
+          setInputError(error.message || 'Failed to fetch address suggestions.');
+        });
     }, 300);
 
     return () => clearTimeout(timer);
-  }, [query, ready]);
+  }, [apiBaseUrl, query]);
 
   const handleSelectSuggestion = (prediction) => {
     const placeId = prediction?.place_id;
-    if (!placeId || !placesServiceRef.current) return;
+    if (!placeId) return;
 
     setLoading(true);
     setInputError('');
-    placesServiceRef.current.getDetails(
-      {
-        placeId,
-        fields: ['address_components', 'formatted_address', 'place_id']
-      },
-      (place, status) => {
-        setLoading(false);
-        const okStatus = window.google?.maps?.places?.PlacesServiceStatus?.OK;
-        if (status !== okStatus || !place) {
-          setInputError('Could not load address details. Try another suggestion.');
-          return;
+    fetch(`${apiBaseUrl}/places/details?place_id=${encodeURIComponent(placeId)}`)
+      .then(async (response) => {
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(payload?.error || 'Could not load address details.');
         }
-
-        const mapped = mapPlaceToAddress(place);
+        return payload;
+      })
+      .then((payload) => {
+        setLoading(false);
+        const mapped = normalizeAddressValue(payload?.data || {});
         setValue(mapped);
-        setQuery(mapped.address_line_1 || prediction.structured_formatting?.main_text || prediction.description || '');
+        setQuery(mapped.address_line_1 || prediction.main_text || prediction.description || '');
         setSuggestions([]);
-      }
-    );
+      })
+      .catch((error) => {
+        setLoading(false);
+        setInputError(error.message || 'Could not load address details. Try another suggestion.');
+      });
   };
 
   return (
@@ -1020,7 +943,7 @@ function StepRenderer({
   }
 
   if (step.type === 'address') {
-    return <AddressAutocompleteField value={value} setValue={setValue} />;
+    return <AddressAutocompleteField value={value} setValue={setValue} apiBaseUrl={apiBaseUrl} />;
   }
 
   if (step.type === 'signingDate') {

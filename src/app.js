@@ -4,6 +4,7 @@ const applicationRoutes = require('./routes/applicationRoutes');
 const calculatorRoutes = require('./routes/calculatorRoutes');
 const conditionRoutes = require('./routes/conditionRoutes');
 const fieldRoutes = require('./routes/fieldRoutes');
+const placesRoutes = require('./routes/placesRoutes');
 
 const app = express();
 
@@ -39,6 +40,7 @@ app.use(applicationRoutes);
 app.use(calculatorRoutes);
 app.use(conditionRoutes);
 app.use(fieldRoutes);
+app.use(placesRoutes);
 
 app.use((req, res) => {
   res.status(404).json({ error: 'Route not found.' });
