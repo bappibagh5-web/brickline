@@ -38,14 +38,14 @@ export default function RateCalculatorPage() {
   const [metrics, setMetrics] = useState(null);
   const [form, setForm] = useState({
     property_state: 'FL',
-    est_fico: '700-739',
+    est_fico: '700-719',
     refinance: 'no',
     owned_six_months: 'yes',
     property_rehab: 'yes',
-    purchase_price: '$160,000',
-    purchase_loan_amount: '$110,000',
-    rehab_budget: '$60,000',
-    comp_value: '$300,000'
+    purchase_price: '$200,000',
+    purchase_loan_amount: '$150,000',
+    rehab_budget: '$75,000',
+    comp_value: '$350,000'
   });
 
   useEffect(() => {

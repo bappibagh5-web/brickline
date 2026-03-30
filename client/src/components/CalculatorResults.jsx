@@ -1,10 +1,11 @@
-function formatMoney(value) {
+function formatMoney(value, options = {}) {
   if (value === null || value === undefined || Number.isNaN(Number(value))) return '-';
+  const digits = options.cents ? 2 : 0;
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: 'USD',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits
   }).format(Number(value));
 }
 
@@ -93,7 +94,7 @@ export default function CalculatorResults({
                 </div>
                 <div>
                   <p className="text-xs text-[#6b7280]">Est. Monthly Payment</p>
-                  <p className="text-[18px] font-semibold leading-tight text-[#1f2937]">{formatMoney(product.monthly_payment)}</p>
+                  <p className="text-[18px] font-semibold leading-tight text-[#1f2937]">{formatMoney(product.monthly_payment, { cents: true })}</p>
                 </div>
                 <button
                   type="button"

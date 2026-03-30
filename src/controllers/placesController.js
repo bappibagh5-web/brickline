@@ -1,7 +1,12 @@
 const GOOGLE_PLACES_BASE_URL = 'https://maps.googleapis.com/maps/api/place';
 
 function getGooglePlacesApiKey() {
-  return process.env.GOOGLE_MAPS_API_KEY || '';
+  return (
+    process.env.GOOGLE_MAPS_API_KEY
+    || process.env.GOOGLE_PLACES_API_KEY
+    || process.env.VITE_GOOGLE_MAPS_API_KEY
+    || ''
+  );
 }
 
 async function autocomplete(req, res, next) {
@@ -97,4 +102,3 @@ module.exports = {
   autocomplete,
   details
 };
-
