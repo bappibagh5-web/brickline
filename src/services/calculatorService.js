@@ -89,7 +89,7 @@ function isAffirmative(value) {
   return String(value).toLowerCase() === 'yes' || String(value).toLowerCase() === 'true';
 }
 
-function getPricingOptions(input, loanAmount, ltcDecimal, isEligible) {
+function getPricingOptions(input, purchaseLoanAmount, ltcDecimal, isEligible) {
   if (!isEligible) return [];
 
   const fico = input.fico_bucket ?? input.est_fico ?? input.fico;
@@ -108,7 +108,8 @@ function getPricingOptions(input, loanAmount, ltcDecimal, isEligible) {
 
   return [12, 18, 24].map((term) => {
     const rate = Number((base12 + TERM_SPREADS[term]).toFixed(3));
-    const monthlyPayment = roundMoney((loanAmount * (rate / 100)) / 12);
+    const annualRateDecimal = rate / 100;
+    const monthlyPayment = roundMoney((purchaseLoanAmount * annualRateDecimal) / 12);
     return {
       term,
       rate,
@@ -126,9 +127,10 @@ function calculateLoanMetrics(input) {
   const rehabCost = getRehabCost(input);
   const arv = getArv(input);
 
-  const totalLoan = loanAmount + rehabCost;
+  const purchaseLoanAmount = loanAmount;
+  const totalLoan = purchaseLoanAmount + rehabCost;
   const totalCost = purchasePrice + rehabCost;
-  const ltcDecimal = purchasePrice > 0 ? loanAmount / purchasePrice : 0;
+  const ltcDecimal = purchasePrice > 0 ? purchaseLoanAmount / purchasePrice : 0;
   const ltarvDecimal = arv > 0 ? totalLoan / arv : 0;
   const spread = arv - totalLoan;
 
@@ -167,13 +169,13 @@ function calculateLoanMetrics(input) {
   }
 
   const isEligible = errors.length === 0;
-  const loanProducts = getPricingOptions(input, loanAmount, ltcDecimal, isEligible);
+  const loanProducts = getPricingOptions(input, purchaseLoanAmount, ltcDecimal, isEligible);
 
   return {
     fico_policy: policy.fico,
     is_eligible: isEligible,
     errors,
-    purchase_loan: roundMoney(loanAmount),
+    purchase_loan: roundMoney(purchaseLoanAmount),
     rehab_loan: roundMoney(rehabCost),
     total_loan: roundMoney(totalLoan),
     total_cost: roundMoney(totalCost),

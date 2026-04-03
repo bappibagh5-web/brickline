@@ -148,12 +148,12 @@ async function generateLoanSummaryPdf(application) {
 
   const purchasePrice = toNumber(data.purchase_price, 60000);
   const downPayment = Math.max(purchasePrice - metrics.purchase_loan, 0);
-  const originationFee = metrics.total_loan * 0.025;
-  const serviceFee = 1495;
+  const originationFee = metrics.purchase_loan * 0.02;
+  const serviceFee = 1295;
   const proRatedInterest = toNumber(selectedProduct.monthly_payment, 0) * 0.12;
   const cashToClose = downPayment + originationFee + serviceFee + proRatedInterest;
   const downPaymentPct = purchasePrice > 0 ? (downPayment / purchasePrice) * 100 : 0;
-  const originationPct = metrics.total_loan > 0 ? (originationFee / metrics.total_loan) * 100 : 0;
+  const hasRehabAmount = toNumber(metrics.rehab_loan, 0) > 0;
 
   const doc = new PDFDocument({ size: 'A4', margin: 0 });
   const chunks = [];
@@ -198,10 +198,15 @@ async function generateLoanSummaryPdf(application) {
 
   writePairRow(doc, 'Total Loan Amount', formatCurrency(metrics.total_loan), 62, pageWidth - 230, y, { boldValue: true, valueSize: 12, labelSize: 12 });
   y += 26;
+  writePairRow(doc, 'Loan Amount', formatCurrency(metrics.purchase_loan), 82, pageWidth - 230, y, { muted: true });
+  y += 22;
   writePairRow(doc, 'Purchase Loan Amount', formatCurrency(metrics.purchase_loan), 82, pageWidth - 230, y, { muted: true });
   y += 22;
-  writePairRow(doc, 'Rehab Holdback', formatCurrency(metrics.rehab_loan), 82, pageWidth - 230, y, { muted: true });
-  y += 24;
+  if (hasRehabAmount) {
+    writePairRow(doc, 'Rehab Amount', formatCurrency(metrics.rehab_loan), 82, pageWidth - 230, y, { muted: true });
+    y += 22;
+  }
+  y += 2;
 
   writePairRow(doc, 'Monthly Payment', formatCurrency(selectedProduct.monthly_payment || 0), 62, pageWidth - 230, y, { boldValue: true, valueSize: 12, labelSize: 12 });
   y += 24;
@@ -215,7 +220,7 @@ async function generateLoanSummaryPdf(application) {
   y += 24;
   writePairRow(doc, 'Down Payment', `${formatCurrency(downPayment)} (${formatPercent(downPaymentPct)})`, 82, pageWidth - 230, y, { muted: true });
   y += 21;
-  writePairRow(doc, 'Origination Fee', `${formatCurrency(originationFee)} (${formatPercent(originationPct)})`, 82, pageWidth - 230, y, { muted: true });
+  writePairRow(doc, 'Origination Fee', `${formatCurrency(originationFee)} (${formatPercent(2)})`, 82, pageWidth - 230, y, { muted: true });
   y += 21;
   writePairRow(doc, 'Service Fee', formatCurrency(serviceFee), 82, pageWidth - 230, y, { muted: true });
   y += 21;

@@ -116,6 +116,74 @@ function getTodayIsoDate() {
   return `${year}-${month}-${day}`;
 }
 
+function parseIsoDate(isoDate) {
+  if (!isoDate || !String(isoDate).includes('-')) return null;
+  const [year, month, day] = String(isoDate).split('-').map(Number);
+  if (!year || !month || !day) return null;
+  const parsed = new Date(year, month - 1, day);
+  if (
+    parsed.getFullYear() !== year
+    || parsed.getMonth() !== (month - 1)
+    || parsed.getDate() !== day
+  ) {
+    return null;
+  }
+  return parsed;
+}
+
+function toIsoDate(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function getEarliestSigningDateIso() {
+  const base = parseIsoDate(getTodayIsoDate()) || new Date();
+  const minDate = new Date(base);
+  minDate.setDate(minDate.getDate() + 5);
+
+  const dayOfWeek = minDate.getDay();
+  if (dayOfWeek === 6) {
+    minDate.setDate(minDate.getDate() + 2);
+  } else if (dayOfWeek === 0) {
+    minDate.setDate(minDate.getDate() + 1);
+  }
+
+  return toIsoDate(minDate);
+}
+
+function isWeekend(isoDate) {
+  const parsed = parseIsoDate(isoDate);
+  if (!parsed) return false;
+  const day = parsed.getDay();
+  return day === 0 || day === 6;
+}
+
+function validateSigningDate(isoDate) {
+  const errorMessage = 'Please select a valid signing date. It must be at least 5 days from today and cannot be on a weekend.';
+  const parsed = parseIsoDate(isoDate);
+  if (!parsed) {
+    return { valid: false, error: errorMessage };
+  }
+
+  const minDateIso = getEarliestSigningDateIso();
+  const minDate = parseIsoDate(minDateIso);
+  if (!minDate) {
+    return { valid: false, error: errorMessage };
+  }
+
+  if (parsed < minDate) {
+    return { valid: false, error: errorMessage };
+  }
+
+  if (isWeekend(isoDate)) {
+    return { valid: false, error: errorMessage };
+  }
+
+  return { valid: true, error: '' };
+}
+
 function formatIsoToUsDate(isoDate) {
   if (!isoDate || !String(isoDate).includes('-')) {
     return 'MM/DD/YYYY';
@@ -172,6 +240,12 @@ function mapStateToCode(stateValue) {
   if (!raw) return '';
   const upper = raw.toUpperCase();
   if (US_STATES.includes(upper)) return upper;
+  if (upper.includes('-')) {
+    const tail = upper.split('-').pop();
+    if (tail && US_STATES.includes(tail)) {
+      return tail;
+    }
+  }
   return US_STATE_NAME_TO_CODE[raw.toLowerCase()] || '';
 }
 
@@ -185,6 +259,7 @@ function mapNominatimAddressToValue(item) {
     || address.town
     || address.village
     || address.hamlet
+    || address.municipality
     || address.county
     || ''
   ).trim();
@@ -203,23 +278,177 @@ function mapNominatimAddressToValue(item) {
   });
 }
 
+function normalizeQueryText(value) {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function scoreSuggestionByQuery(suggestion, queryText) {
+  const query = normalizeQueryText(queryText);
+  if (!query) return 0;
+
+  const mainText = normalizeQueryText(suggestion?.main_text || '');
+  const description = normalizeQueryText(suggestion?.description || '');
+  const haystack = `${mainText} ${description}`.trim();
+  if (!haystack) return -999;
+
+  let score = 0;
+  if (mainText.startsWith(query)) score += 180;
+  if (haystack.startsWith(query)) score += 120;
+  if (haystack.includes(query)) score += 90;
+
+  const tokens = query.split(' ').filter(Boolean);
+  for (const token of tokens) {
+    if (!haystack.includes(token)) return -999;
+    score += 20;
+    if (mainText.startsWith(token)) score += 8;
+  }
+
+  if (/^\d/.test(query) && /^\d/.test(mainText || haystack)) {
+    score += 30;
+  }
+
+  if (/\b(united states|usa)\b/.test(description)) {
+    score += 5;
+  }
+
+  return score;
+}
+
+function rankSuggestions(suggestions, queryText) {
+  return (Array.isArray(suggestions) ? suggestions : [])
+    .map((item, index) => ({
+      ...item,
+      _score: scoreSuggestionByQuery(item, queryText),
+      _index: index
+    }))
+    .filter((item) => item._score > -900)
+    .sort((a, b) => (b._score - a._score) || (a._index - b._index))
+    .map(({ _score, _index, ...item }) => item);
+}
+
+let googlePlacesScriptPromise = null;
+
+function loadGooglePlacesLibrary(apiKey) {
+  if (window.google?.maps?.places) {
+    return Promise.resolve(window.google);
+  }
+
+  if (!apiKey) {
+    return Promise.reject(new Error('Missing VITE_GOOGLE_MAPS_API_KEY'));
+  }
+
+  if (googlePlacesScriptPromise) {
+    return googlePlacesScriptPromise;
+  }
+
+  googlePlacesScriptPromise = new Promise((resolve, reject) => {
+    const existing = document.querySelector('script[data-google-places-loader="true"]');
+    if (existing) {
+      existing.addEventListener('load', () => resolve(window.google), { once: true });
+      existing.addEventListener('error', () => reject(new Error('Failed to load Google Places script.')), { once: true });
+      return;
+    }
+
+    const script = document.createElement('script');
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(apiKey)}&libraries=places`;
+    script.async = true;
+    script.defer = true;
+    script.dataset.googlePlacesLoader = 'true';
+    script.onload = () => {
+      if (window.google?.maps?.places) {
+        resolve(window.google);
+      } else {
+        reject(new Error('Google Places library not available.'));
+      }
+    };
+    script.onerror = () => reject(new Error('Failed to load Google Places script.'));
+    document.head.appendChild(script);
+  });
+
+  return googlePlacesScriptPromise;
+}
+
+function pickGoogleAddressComponent(components, type) {
+  return (Array.isArray(components) ? components : []).find((item) => Array.isArray(item.types) && item.types.includes(type));
+}
+
+function mapGooglePlaceToAddress(place, placeId) {
+  const components = Array.isArray(place?.address_components) ? place.address_components : [];
+  const streetNumber = pickGoogleAddressComponent(components, 'street_number')?.long_name || '';
+  const route = pickGoogleAddressComponent(components, 'route')?.long_name || '';
+  const city =
+    pickGoogleAddressComponent(components, 'locality')?.long_name
+    || pickGoogleAddressComponent(components, 'postal_town')?.long_name
+    || pickGoogleAddressComponent(components, 'sublocality')?.long_name
+    || '';
+  const state = pickGoogleAddressComponent(components, 'administrative_area_level_1')?.short_name || '';
+  const zip = pickGoogleAddressComponent(components, 'postal_code')?.long_name || '';
+  const addressLine1 = [streetNumber, route].filter(Boolean).join(' ').trim();
+  return normalizeAddressValue({
+    address_line_1: addressLine1,
+    address_line_2: '',
+    city,
+    state,
+    zip,
+    full_address: place?.formatted_address || addressLine1,
+    place_id: place?.place_id || placeId || ''
+  });
+}
+
 function AddressAutocompleteField({ value, setValue, apiBaseUrl }) {
   const requestIdRef = useRef(0);
+  const googleAutocompleteServiceRef = useRef(null);
+  const googlePlacesServiceRef = useRef(null);
+  const lastSyncedPlaceIdRef = useRef('');
+  const userTypingRef = useRef(false);
   const [query, setQuery] = useState(value?.address_line_1 || extractStreetLine(value?.full_address) || '');
   const [suggestions, setSuggestions] = useState([]);
   const [loading, setLoading] = useState(false);
   const [inputError, setInputError] = useState('');
+  const [googleLoaded, setGoogleLoaded] = useState(false);
+  const [geoBias, setGeoBias] = useState(null);
 
   useEffect(() => {
+    const apiKey = String(import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '').trim();
+    loadGooglePlacesLibrary(apiKey)
+      .then(() => {
+        googleAutocompleteServiceRef.current = new window.google.maps.places.AutocompleteService();
+        googlePlacesServiceRef.current = new window.google.maps.places.PlacesService(document.createElement('div'));
+        setGoogleLoaded(true);
+      })
+      .catch(() => {
+        setGoogleLoaded(false);
+      });
+  }, []);
+
+  useEffect(() => {
+    if (!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setGeoBias({
+          lat: position.coords.latitude,
+          lng: position.coords.longitude
+        });
+      },
+      () => {}
+    );
+  }, []);
+
+  useEffect(() => {
+    const placeId = String(value?.place_id || '');
     const nextStreet = value?.address_line_1 || extractStreetLine(value?.full_address) || '';
-    if (nextStreet && nextStreet !== query) {
+    if (!userTypingRef.current && placeId && placeId !== lastSyncedPlaceIdRef.current && nextStreet !== query) {
       setQuery(nextStreet);
+      lastSyncedPlaceIdRef.current = placeId;
     }
   }, [query, value?.address_line_1, value?.full_address]);
 
   useEffect(() => {
-    const input = String(query || '').trim();
-    if (input.length < 3) {
+    const rawInput = String(query ?? '');
+    if (normalizeQueryText(rawInput).length < 3) {
       setSuggestions([]);
       setLoading(false);
       return;
@@ -229,97 +458,120 @@ function AddressAutocompleteField({ value, setValue, apiBaseUrl }) {
     setInputError('');
     const currentRequestId = ++requestIdRef.current;
     const timer = setTimeout(async () => {
-      const fallbackToOsm = async () => {
-        const osmResponse = await fetch(
-          `https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&countrycodes=us&limit=6&q=${encodeURIComponent(input)}`
-        );
-        if (!osmResponse.ok) {
-          throw new Error('Failed to fetch address suggestions.');
-        }
-        const osmPayload = await osmResponse.json().catch(() => []);
-        const osmSuggestions = Array.isArray(osmPayload)
-          ? osmPayload.map((item) => ({
-              provider: 'osm',
-              place_id: `osm:${item.place_id}`,
-              description: item.display_name,
-              main_text: extractStreetLine(item.display_name),
-              mappedAddress: mapNominatimAddressToValue(item)
-            }))
-          : [];
-        return osmSuggestions;
-      };
-
       try {
-        const response = await fetch(`${apiBaseUrl}/places/autocomplete?input=${encodeURIComponent(input)}`);
-        const payload = await response.json().catch(() => ({}));
+        let nextSuggestions = [];
+
+        if (googleLoaded && googleAutocompleteServiceRef.current) {
+          const predictionRequest = {
+            input: rawInput,
+            types: ['address'],
+            componentRestrictions: { country: 'us' }
+          };
+
+          if (geoBias) {
+            predictionRequest.location = new window.google.maps.LatLng(geoBias.lat, geoBias.lng);
+            predictionRequest.radius = 50000;
+          }
+
+          const googlePredictions = await new Promise((resolve, reject) => {
+            googleAutocompleteServiceRef.current.getPlacePredictions(predictionRequest, (predictions, status) => {
+              const placesStatus = window.google.maps.places.PlacesServiceStatus;
+              if (status === placesStatus.OK) {
+                resolve(Array.isArray(predictions) ? predictions : []);
+                return;
+              }
+              if (status === placesStatus.ZERO_RESULTS) {
+                resolve([]);
+                return;
+              }
+              reject(new Error('Failed to fetch address suggestions.'));
+            });
+          });
+
+          nextSuggestions = rankSuggestions(
+            googlePredictions.map((item) => ({
+              provider: 'google',
+              place_id: item.place_id,
+              description: item.description,
+              main_text: item?.structured_formatting?.main_text || ''
+            })),
+            rawInput
+          );
+        } else {
+          const response = await fetch(`${apiBaseUrl}/places/autocomplete?input=${encodeURIComponent(rawInput)}`);
+          const payload = await response.json().catch(() => ({}));
+          if (!response.ok) {
+            throw new Error(payload?.error || 'Failed to fetch address suggestions.');
+          }
+          nextSuggestions = rankSuggestions(
+            (Array.isArray(payload?.predictions) ? payload.predictions : []).map((item) => ({
+              ...item,
+              provider: 'backend'
+            })),
+            rawInput
+          );
+        }
+
         if (currentRequestId !== requestIdRef.current) return;
-
-        if (!response.ok) {
-          throw new Error(payload?.error || 'Failed to fetch address suggestions.');
-        }
-
-        let nextSuggestions = Array.isArray(payload?.predictions) ? payload.predictions : [];
-        if (nextSuggestions.length === 0) {
-          nextSuggestions = await fallbackToOsm();
-          if (currentRequestId !== requestIdRef.current) return;
-        }
-
         setLoading(false);
         setSuggestions(nextSuggestions);
-      } catch (_error) {
+      } catch (error) {
         if (currentRequestId !== requestIdRef.current) return;
-        try {
-          const nextSuggestions = await fallbackToOsm();
-          if (currentRequestId !== requestIdRef.current) return;
-          setLoading(false);
-          setSuggestions(nextSuggestions);
-          setInputError(nextSuggestions.length === 0 ? 'No address suggestions found.' : '');
-        } catch (fallbackError) {
-          if (currentRequestId !== requestIdRef.current) return;
-          setLoading(false);
-          setSuggestions([]);
-          setInputError(fallbackError.message || 'Failed to fetch address suggestions.');
-        }
+        setLoading(false);
+        setSuggestions([]);
+        setInputError(error.message || 'Failed to fetch address suggestions.');
       }
-    }, 300);
+    }, 250);
 
     return () => clearTimeout(timer);
-  }, [apiBaseUrl, query]);
+  }, [apiBaseUrl, geoBias, googleLoaded, query]);
 
-  const handleSelectSuggestion = (prediction) => {
-    if (prediction?.provider === 'osm') {
-      const mapped = normalizeAddressValue(prediction?.mappedAddress || {});
-      setValue(mapped);
-      setQuery(mapped.address_line_1 || prediction.main_text || prediction.description || '');
-      setSuggestions([]);
-      setInputError('');
-      return;
-    }
-
+  const handleSelectSuggestion = async (prediction) => {
     const placeId = prediction?.place_id;
     if (!placeId) return;
 
+    userTypingRef.current = false;
     setLoading(true);
     setInputError('');
-    fetch(`${apiBaseUrl}/places/details?place_id=${encodeURIComponent(placeId)}`)
-      .then(async (response) => {
+    try {
+      let mapped = null;
+
+      if (prediction?.provider === 'google' && googleLoaded && googlePlacesServiceRef.current) {
+        mapped = await new Promise((resolve, reject) => {
+          googlePlacesServiceRef.current.getDetails(
+            {
+              placeId,
+              fields: ['address_components', 'formatted_address', 'place_id']
+            },
+            (place, status) => {
+              const placesStatus = window.google.maps.places.PlacesServiceStatus;
+              if (status === placesStatus.OK && place) {
+                resolve(mapGooglePlaceToAddress(place, placeId));
+                return;
+              }
+              reject(new Error('Could not load address details.'));
+            }
+          );
+        });
+      } else {
+        const response = await fetch(`${apiBaseUrl}/places/details?place_id=${encodeURIComponent(placeId)}`);
         const payload = await response.json().catch(() => ({}));
         if (!response.ok) {
           throw new Error(payload?.error || 'Could not load address details.');
         }
-        return payload;
-      })
-      .then((payload) => {
-        setLoading(false);
-        const mapped = normalizeAddressValue(payload?.data || {});
-        setValue(mapped);
-        setQuery(mapped.address_line_1 || prediction.main_text || prediction.description || '');
-        setSuggestions([]);
-      })
-      .catch((error) => {
-        setLoading(false);
-        setInputError(error.message || 'Could not load address details. Try another suggestion.');
-      });
+        mapped = normalizeAddressValue(payload?.data || {});
+      }
+
+      const nextAddress = normalizeAddressValue(mapped || {});
+      setValue(nextAddress);
+      setQuery(nextAddress.address_line_1 || prediction.main_text || prediction.description || '');
+      lastSyncedPlaceIdRef.current = String(nextAddress.place_id || placeId);
+      setSuggestions([]);
+      setLoading(false);
+    } catch (error) {
+      setLoading(false);
+      setInputError(error.message || 'Could not load address details. Try another suggestion.');
+    }
   };
 
   return (
@@ -331,6 +583,7 @@ function AddressAutocompleteField({ value, setValue, apiBaseUrl }) {
           value={query}
           onChange={(event) => {
             const nextQuery = event.target.value;
+            userTypingRef.current = true;
             setQuery(nextQuery);
             setValue({
               address_line_1: nextQuery,
@@ -341,6 +594,7 @@ function AddressAutocompleteField({ value, setValue, apiBaseUrl }) {
               full_address: '',
               place_id: ''
             });
+            setInputError('');
           }}
           placeholder="Start typing property address..."
           className="h-11 w-full rounded-none border border-[#9aa4ae] bg-[#f4f5f5] px-4 text-[14px] text-[#475569] placeholder:text-[#8d96b6] transition-all duration-150 focus:border-[#4e6bf0] focus:bg-[#f3f6ff] focus:outline-none"
@@ -398,7 +652,10 @@ function AddressAutocompleteField({ value, setValue, apiBaseUrl }) {
 
 function SigningDateStep({ value, setValue, onGoBack }) {
   const [showNotice, setShowNotice] = useState(true);
-  const effectiveDate = value || getTodayIsoDate();
+  const [validationError, setValidationError] = useState('');
+  const earliestDateIso = getEarliestSigningDateIso();
+  const effectiveDate = value || earliestDateIso;
+  const validation = validateSigningDate(effectiveDate);
   const prettyDate = formatIsoToUsDate(effectiveDate);
 
   return (
@@ -422,7 +679,17 @@ function SigningDateStep({ value, setValue, onGoBack }) {
           <input
             type="date"
             value={effectiveDate}
-            onChange={(event) => setValue(event.target.value)}
+            min={earliestDateIso}
+            onChange={(event) => {
+              const nextDate = event.target.value;
+              const nextValidation = validateSigningDate(nextDate);
+              if (!nextValidation.valid) {
+                setValidationError(nextValidation.error);
+                return;
+              }
+              setValidationError('');
+              setValue(nextDate);
+            }}
             className="h-12 rounded-none border border-[#9aa4ae] bg-[#f4f5f5] px-3 text-[24px] leading-none text-[#334155] focus:border-[#4e6bf0] focus:bg-[#f3f6ff] focus:outline-none"
           />
         </label>
@@ -454,6 +721,11 @@ function SigningDateStep({ value, setValue, onGoBack }) {
       >
         Go Back
       </button>
+      {!validation.valid || validationError ? (
+        <p className="text-sm font-medium text-[#b63d3d]">
+          {validationError || 'Please select a valid signing date. It must be at least 5 days from today and cannot be on a weekend.'}
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -969,7 +1241,8 @@ function getStepValue(step, answers) {
   if (step.type === 'name') {
     return {
       first_name: answers.first_name || '',
-      last_name: answers.last_name || ''
+      last_name: answers.last_name || '',
+      suffix: answers.suffix || ''
     };
   }
 
@@ -993,7 +1266,7 @@ function getStepValue(step, answers) {
     if (step.key && answers[step.key]) {
       return answers[step.key];
     }
-    return getTodayIsoDate();
+    return getEarliestSigningDateIso();
   }
 
   if (step.type === 'eligibilityConfirm') {
@@ -1095,20 +1368,35 @@ function StepRenderer({
   if (step.type === 'name') {
     return (
       <div className="mt-6 grid gap-2.5">
-        <input
-          type="text"
-          value={value?.first_name || ''}
-          onChange={(event) => setValue({ ...value, first_name: event.target.value })}
-          className="h-11 w-full rounded-none border border-[#9aa4ae] bg-[#f4f5f5] px-4 text-[14px] text-[#475569] placeholder:text-[#8d96b6] transition-all duration-150 focus:border-[#4e6bf0] focus:bg-[#f3f6ff] focus:outline-none"
-          placeholder="First name"
-        />
-        <input
-          type="text"
-          value={value?.last_name || ''}
-          onChange={(event) => setValue({ ...value, last_name: event.target.value })}
-          className="h-11 w-full rounded-none border border-[#9aa4ae] bg-[#f4f5f5] px-4 text-[14px] text-[#475569] placeholder:text-[#8d96b6] transition-all duration-150 focus:border-[#4e6bf0] focus:bg-[#f3f6ff] focus:outline-none"
-          placeholder="Last name"
-        />
+        <div className="grid grid-cols-1 gap-2.5 md:grid-cols-2">
+          <input
+            type="text"
+            value={value?.first_name || ''}
+            onChange={(event) => setValue({ ...value, first_name: event.target.value })}
+            className="h-11 w-full rounded-none border border-[#9aa4ae] bg-[#f4f5f5] px-4 text-[14px] text-[#475569] placeholder:text-[#8d96b6] transition-all duration-150 focus:border-[#4e6bf0] focus:bg-[#f3f6ff] focus:outline-none"
+            placeholder="First Name"
+          />
+          <input
+            type="text"
+            value={value?.last_name || ''}
+            onChange={(event) => setValue({ ...value, last_name: event.target.value })}
+            className="h-11 w-full rounded-none border border-[#9aa4ae] bg-[#f4f5f5] px-4 text-[14px] text-[#475569] placeholder:text-[#8d96b6] transition-all duration-150 focus:border-[#4e6bf0] focus:bg-[#f3f6ff] focus:outline-none"
+            placeholder="Last Name"
+          />
+        </div>
+        <select
+          value={value?.suffix || ''}
+          onChange={(event) => setValue({ ...value, suffix: event.target.value })}
+          className="h-11 w-full rounded-none border border-[#9aa4ae] bg-[#f4f5f5] px-4 text-[14px] text-[#475569] transition-all duration-150 focus:border-[#4e6bf0] focus:bg-[#f3f6ff] focus:outline-none"
+        >
+          <option value="">Suffix (Optional)</option>
+          <option value="Sr">Sr</option>
+          <option value="Jr">Jr</option>
+          <option value="II">II</option>
+          <option value="III">III</option>
+          <option value="IV">IV</option>
+          <option value="V">V</option>
+        </select>
       </div>
     );
   }
@@ -1222,10 +1510,8 @@ export default function FunnelStepPage() {
       return Boolean(String(value?.place_id || '').trim());
     }
 
-    if (step.type === 'eligibilityConfirm') {
-      return {
-        non_owner_occupied: Boolean(value?.non_owner_occupied)
-      };
+    if (step.type === 'signingDate') {
+      return validateSigningDate(value).valid;
     }
 
     if (step.type === 'borrowerDetails') {
@@ -1372,31 +1658,45 @@ export default function FunnelStepPage() {
     if (step.type === 'name') {
       const firstName = String(nextValue?.first_name || '');
       const lastName = String(nextValue?.last_name || '');
+      const suffix = String(nextValue?.suffix || '');
       const fullName = `${firstName} ${lastName}`.trim();
 
       setAnswer('first_name', firstName);
       setAnswer('last_name', lastName);
+      setAnswer('suffix', suffix);
       setAnswer('name', fullName);
       return;
     }
 
     if (step.type === 'address') {
-      const normalized = normalizeAddressValue(nextValue);
-      setAnswer('address_line_1', normalized.address_line_1 || '');
-      setAnswer('address_line_2', normalized.address_line_2 || '');
-      setAnswer('city', normalized.city || '');
-      setAnswer('state', normalized.state || '');
-      setAnswer('zip', normalized.zip || '');
-      setAnswer('full_address', normalized.full_address || '');
-      setAnswer('place_id', normalized.place_id || '');
-      setAnswer(getAddressFieldKey(step, 'address_line_1'), normalized.address_line_1 || '');
-      setAnswer(getAddressFieldKey(step, 'address_line_2'), normalized.address_line_2 || '');
-      setAnswer(getAddressFieldKey(step, 'city'), normalized.city || '');
-      setAnswer(getAddressFieldKey(step, 'state'), normalized.state || '');
-      setAnswer(getAddressFieldKey(step, 'zip'), normalized.zip || '');
-      setAnswer(getAddressFieldKey(step, 'full_address'), normalized.full_address || '');
-      setAnswer(getAddressFieldKey(step, 'place_id'), normalized.place_id || '');
-      setAnswer('property_address', normalized.full_address || '');
+      const hasSelectedSuggestion = Boolean(String(nextValue?.place_id || '').trim());
+      const nextAddress = hasSelectedSuggestion
+        ? normalizeAddressValue(nextValue)
+        : {
+            address_line_1: String(nextValue?.address_line_1 ?? ''),
+            address_line_2: String(nextValue?.address_line_2 ?? ''),
+            city: String(nextValue?.city ?? ''),
+            state: String(nextValue?.state ?? ''),
+            zip: String(nextValue?.zip ?? ''),
+            full_address: String(nextValue?.full_address ?? ''),
+            place_id: ''
+          };
+
+      setAnswer('address_line_1', nextAddress.address_line_1 || '');
+      setAnswer('address_line_2', nextAddress.address_line_2 || '');
+      setAnswer('city', nextAddress.city || '');
+      setAnswer('state', nextAddress.state || '');
+      setAnswer('zip', nextAddress.zip || '');
+      setAnswer('full_address', nextAddress.full_address || '');
+      setAnswer('place_id', nextAddress.place_id || '');
+      setAnswer(getAddressFieldKey(step, 'address_line_1'), nextAddress.address_line_1 || '');
+      setAnswer(getAddressFieldKey(step, 'address_line_2'), nextAddress.address_line_2 || '');
+      setAnswer(getAddressFieldKey(step, 'city'), nextAddress.city || '');
+      setAnswer(getAddressFieldKey(step, 'state'), nextAddress.state || '');
+      setAnswer(getAddressFieldKey(step, 'zip'), nextAddress.zip || '');
+      setAnswer(getAddressFieldKey(step, 'full_address'), nextAddress.full_address || '');
+      setAnswer(getAddressFieldKey(step, 'place_id'), nextAddress.place_id || '');
+      setAnswer('property_address', nextAddress.full_address || nextAddress.address_line_1 || '');
       return;
     }
 
@@ -1429,9 +1729,11 @@ export default function FunnelStepPage() {
     if (step.type === 'name') {
       const firstName = String(value?.first_name || '').trim();
       const lastName = String(value?.last_name || '').trim();
+      const suffix = String(value?.suffix || '').trim();
       return {
         first_name: firstName,
         last_name: lastName,
+        suffix,
         name: `${firstName} ${lastName}`.trim()
       };
     }

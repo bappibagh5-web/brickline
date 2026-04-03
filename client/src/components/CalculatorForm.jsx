@@ -46,6 +46,7 @@ export default function CalculatorForm({
   metrics,
   loading
 }) {
+  const isRehabDisabled = form.property_rehab === 'no';
   const hasCustomState = Boolean(
     form.property_state && !US_STATE_OPTIONS.includes(String(form.property_state).toUpperCase())
   );
@@ -102,19 +103,6 @@ export default function CalculatorForm({
             <option value="yes">Yes</option>
           </select>
         </label>
-        {form.refinance === 'yes' ? (
-          <label className="grid gap-1.5">
-            <FieldLabel>Prop. Owned ≥ 6 Months</FieldLabel>
-            <select
-              value={form.owned_six_months}
-              onChange={(event) => onFormChange('owned_six_months', event.target.value)}
-              className={inputClass}
-            >
-              <option value="yes">Yes</option>
-              <option value="no">No</option>
-            </select>
-          </label>
-        ) : null}
         <label className="grid gap-1.5">
           <FieldLabel>Purchase Price</FieldLabel>
           <input
@@ -141,6 +129,22 @@ export default function CalculatorForm({
         </div>
       </div>
 
+      {form.refinance === 'yes' ? (
+        <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-[1fr_1fr_1fr_220px]">
+          <label className="grid gap-1.5">
+            <FieldLabel>Prop. Owned ≥ 6 Months</FieldLabel>
+            <select
+              value={form.owned_six_months}
+              onChange={(event) => onFormChange('owned_six_months', event.target.value)}
+              className={inputClass}
+            >
+              <option value="yes">Yes</option>
+              <option value="no">No</option>
+            </select>
+          </label>
+        </div>
+      ) : null}
+
       <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-[1fr_1fr_1fr_220px]">
         <label className="grid gap-1.5">
           <FieldLabel>Property Rehab</FieldLabel>
@@ -154,12 +158,21 @@ export default function CalculatorForm({
           </select>
         </label>
         <label className="grid gap-1.5">
-          <FieldLabel>Estimated Cost of Rehab</FieldLabel>
+          <FieldLabel>
+            Estimated Cost of Rehab {isRehabDisabled ? '(Locked)' : ''}
+          </FieldLabel>
           <input
             type="text"
-            value={form.rehab_budget}
+            value={isRehabDisabled ? '$0' : form.rehab_budget}
             onChange={(event) => onFormChange('rehab_budget', event.target.value)}
-            className={inputClass}
+            disabled={isRehabDisabled}
+            readOnly={isRehabDisabled}
+            aria-disabled={isRehabDisabled}
+            className={`${inputClass} ${
+              isRehabDisabled
+                ? 'cursor-not-allowed border-[#a8b2c2] bg-[#e5e7eb] text-[#6b7280]'
+                : ''
+            }`}
           />
         </label>
         <label className="grid gap-1.5">
