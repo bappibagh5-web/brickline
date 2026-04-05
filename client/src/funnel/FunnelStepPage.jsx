@@ -301,23 +301,15 @@ function rankSuggestions(suggestions, queryText) {
 }
 
 let googlePlacesScriptPromise = null;
-
-function getRuntimeGoogleMapsApiKey() {
-  const value = String(window.RUNTIME_CONFIG?.GOOGLE_MAPS_API_KEY || '').trim();
-  if (!value || value === 'REPLACE_AT_RUNTIME') {
-    return '';
-  }
-  return value;
-}
+const GOOGLE_KEY = String(import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '').trim();
 
 function loadGooglePlacesLibrary() {
   if (window.google?.maps?.places) {
     return Promise.resolve(window.google);
   }
 
-  const apiKey = getRuntimeGoogleMapsApiKey();
-  if (!apiKey) {
-    return Promise.reject(new Error('Missing runtime Google Maps API key.'));
+  if (!GOOGLE_KEY) {
+    return Promise.reject(new Error('Address suggestions are temporarily unavailable.'));
   }
 
   if (googlePlacesScriptPromise) {
@@ -333,7 +325,7 @@ function loadGooglePlacesLibrary() {
     }
 
     const script = document.createElement('script');
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(apiKey)}&libraries=places`;
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(GOOGLE_KEY)}&libraries=places`;
     script.async = true;
     script.defer = true;
     script.dataset.googlePlacesLoader = 'true';
@@ -441,7 +433,7 @@ function AddressAutocompleteField({ value, setValue }) {
         let nextSuggestions = [];
 
         if (!googleLoaded || !googleAutocompleteServiceRef.current) {
-          throw new Error('Google Places is unavailable. Check runtime config key.');
+          throw new Error('Address suggestions are temporarily unavailable.');
         }
 
         const predictionRequest = {
@@ -505,7 +497,7 @@ function AddressAutocompleteField({ value, setValue }) {
       let mapped = null;
 
       if (!googleLoaded || !googlePlacesServiceRef.current) {
-        throw new Error('Google Places is unavailable. Check runtime config key.');
+        throw new Error('Address suggestions are temporarily unavailable.');
       }
 
       mapped = await new Promise((resolve, reject) => {
