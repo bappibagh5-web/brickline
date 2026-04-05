@@ -249,35 +249,6 @@ function mapStateToCode(stateValue) {
   return US_STATE_NAME_TO_CODE[raw.toLowerCase()] || '';
 }
 
-function mapNominatimAddressToValue(item) {
-  const address = item?.address || {};
-  const houseNumber = String(address.house_number || '').trim();
-  const road = String(address.road || address.pedestrian || address.footway || '').trim();
-  const line1 = [houseNumber, road].filter(Boolean).join(' ').trim() || extractStreetLine(item?.display_name || '');
-  const city = String(
-    address.city
-    || address.town
-    || address.village
-    || address.hamlet
-    || address.municipality
-    || address.county
-    || ''
-  ).trim();
-  const state = mapStateToCode(address.state_code || address.state);
-  const zip = String(address.postcode || '').trim();
-  const fullAddress = String(item?.display_name || '').trim();
-
-  return normalizeAddressValue({
-    address_line_1: line1,
-    address_line_2: '',
-    city,
-    state,
-    zip,
-    full_address: fullAddress,
-    place_id: `osm:${item?.place_id || ''}`
-  });
-}
-
 function normalizeQueryText(value) {
   return String(value || '')
     .toLowerCase()
@@ -398,7 +369,7 @@ function mapGooglePlaceToAddress(place, placeId) {
   });
 }
 
-function AddressAutocompleteField({ value, setValue, apiBaseUrl }) {
+function AddressAutocompleteField({ value, setValue }) {
   const requestIdRef = useRef(0);
   const googleAutocompleteServiceRef = useRef(null);
   const googlePlacesServiceRef = useRef(null);
@@ -461,56 +432,45 @@ function AddressAutocompleteField({ value, setValue, apiBaseUrl }) {
       try {
         let nextSuggestions = [];
 
-        if (googleLoaded && googleAutocompleteServiceRef.current) {
-          const predictionRequest = {
-            input: rawInput,
-            types: ['address'],
-            componentRestrictions: { country: 'us' }
-          };
-
-          if (geoBias) {
-            predictionRequest.location = new window.google.maps.LatLng(geoBias.lat, geoBias.lng);
-            predictionRequest.radius = 50000;
-          }
-
-          const googlePredictions = await new Promise((resolve, reject) => {
-            googleAutocompleteServiceRef.current.getPlacePredictions(predictionRequest, (predictions, status) => {
-              const placesStatus = window.google.maps.places.PlacesServiceStatus;
-              if (status === placesStatus.OK) {
-                resolve(Array.isArray(predictions) ? predictions : []);
-                return;
-              }
-              if (status === placesStatus.ZERO_RESULTS) {
-                resolve([]);
-                return;
-              }
-              reject(new Error('Failed to fetch address suggestions.'));
-            });
-          });
-
-          nextSuggestions = rankSuggestions(
-            googlePredictions.map((item) => ({
-              provider: 'google',
-              place_id: item.place_id,
-              description: item.description,
-              main_text: item?.structured_formatting?.main_text || ''
-            })),
-            rawInput
-          );
-        } else {
-          const response = await fetch(`${apiBaseUrl}/places/autocomplete?input=${encodeURIComponent(rawInput)}`);
-          const payload = await response.json().catch(() => ({}));
-          if (!response.ok) {
-            throw new Error(payload?.error || 'Failed to fetch address suggestions.');
-          }
-          nextSuggestions = rankSuggestions(
-            (Array.isArray(payload?.predictions) ? payload.predictions : []).map((item) => ({
-              ...item,
-              provider: 'backend'
-            })),
-            rawInput
-          );
+        if (!googleLoaded || !googleAutocompleteServiceRef.current) {
+          throw new Error('Google Places is unavailable. Check VITE_GOOGLE_MAPS_API_KEY.');
         }
+
+        const predictionRequest = {
+          input: rawInput,
+          types: ['address'],
+          componentRestrictions: { country: 'us' }
+        };
+
+        if (geoBias) {
+          predictionRequest.location = new window.google.maps.LatLng(geoBias.lat, geoBias.lng);
+          predictionRequest.radius = 50000;
+        }
+
+        const googlePredictions = await new Promise((resolve, reject) => {
+          googleAutocompleteServiceRef.current.getPlacePredictions(predictionRequest, (predictions, status) => {
+            const placesStatus = window.google.maps.places.PlacesServiceStatus;
+            if (status === placesStatus.OK) {
+              resolve(Array.isArray(predictions) ? predictions : []);
+              return;
+            }
+            if (status === placesStatus.ZERO_RESULTS) {
+              resolve([]);
+              return;
+            }
+            reject(new Error('Failed to fetch address suggestions.'));
+          });
+        });
+
+        nextSuggestions = rankSuggestions(
+          googlePredictions.map((item) => ({
+            provider: 'google',
+            place_id: item.place_id,
+            description: item.description,
+            main_text: item?.structured_formatting?.main_text || ''
+          })),
+          rawInput
+        );
 
         if (currentRequestId !== requestIdRef.current) return;
         setLoading(false);
@@ -524,7 +484,7 @@ function AddressAutocompleteField({ value, setValue, apiBaseUrl }) {
     }, 250);
 
     return () => clearTimeout(timer);
-  }, [apiBaseUrl, geoBias, googleLoaded, query]);
+  }, [geoBias, googleLoaded, query]);
 
   const handleSelectSuggestion = async (prediction) => {
     const placeId = prediction?.place_id;
@@ -536,31 +496,26 @@ function AddressAutocompleteField({ value, setValue, apiBaseUrl }) {
     try {
       let mapped = null;
 
-      if (prediction?.provider === 'google' && googleLoaded && googlePlacesServiceRef.current) {
-        mapped = await new Promise((resolve, reject) => {
-          googlePlacesServiceRef.current.getDetails(
-            {
-              placeId,
-              fields: ['address_components', 'formatted_address', 'place_id']
-            },
-            (place, status) => {
-              const placesStatus = window.google.maps.places.PlacesServiceStatus;
-              if (status === placesStatus.OK && place) {
-                resolve(mapGooglePlaceToAddress(place, placeId));
-                return;
-              }
-              reject(new Error('Could not load address details.'));
-            }
-          );
-        });
-      } else {
-        const response = await fetch(`${apiBaseUrl}/places/details?place_id=${encodeURIComponent(placeId)}`);
-        const payload = await response.json().catch(() => ({}));
-        if (!response.ok) {
-          throw new Error(payload?.error || 'Could not load address details.');
-        }
-        mapped = normalizeAddressValue(payload?.data || {});
+      if (!googleLoaded || !googlePlacesServiceRef.current) {
+        throw new Error('Google Places is unavailable. Check VITE_GOOGLE_MAPS_API_KEY.');
       }
+
+      mapped = await new Promise((resolve, reject) => {
+        googlePlacesServiceRef.current.getDetails(
+          {
+            placeId,
+            fields: ['address_components', 'formatted_address', 'place_id']
+          },
+          (place, status) => {
+            const placesStatus = window.google.maps.places.PlacesServiceStatus;
+            if (status === placesStatus.OK && place) {
+              resolve(mapGooglePlaceToAddress(place, placeId));
+              return;
+            }
+            reject(new Error('Could not load address details.'));
+          }
+        );
+      });
 
       const nextAddress = normalizeAddressValue(mapped || {});
       setValue(nextAddress);
@@ -1402,7 +1357,7 @@ function StepRenderer({
   }
 
   if (step.type === 'address') {
-    return <AddressAutocompleteField value={value} setValue={setValue} apiBaseUrl={apiBaseUrl} />;
+    return <AddressAutocompleteField value={value} setValue={setValue} />;
   }
 
   if (step.type === 'signingDate') {
