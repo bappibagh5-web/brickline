@@ -38,6 +38,7 @@ export default function RateCalculatorPage() {
   const [metrics, setMetrics] = useState(null);
   const [form, setForm] = useState({
     property_state: 'FL',
+    property_type: '',
     est_fico: '700-719',
     refinance: 'no',
     owned_six_months: 'yes',
@@ -67,6 +68,10 @@ export default function RateCalculatorPage() {
             data.lead_property_state ||
             data.purchase_property_state ||
             prev.property_state,
+          property_type:
+            data.property_type ||
+            data.calculator_inputs?.property_type ||
+            prev.property_type,
           est_fico: data.est_fico || prev.est_fico,
           refinance: data.refinance || prev.refinance,
           owned_six_months: data.owned_six_months || prev.owned_six_months,
@@ -119,6 +124,8 @@ export default function RateCalculatorPage() {
         const result = await calculateLoan(apiBaseUrl, {
           fico_bucket: form.est_fico,
           est_fico: form.est_fico,
+          property_type: form.property_type,
+          propertyType: form.property_type,
           refinance: form.refinance,
           owned_six_months: form.owned_six_months,
           property_rehab: form.property_rehab,
@@ -151,6 +158,7 @@ export default function RateCalculatorPage() {
     form.purchase_loan_amount,
     form.rehab_budget,
     form.comp_value,
+    form.property_type,
     form.refinance,
     form.owned_six_months,
     form.est_fico,
@@ -172,6 +180,10 @@ export default function RateCalculatorPage() {
 
   const handleChooseProduct = async (product) => {
     if (!effectiveApplicationId || !product || loading || savingProduct) return;
+    if (!String(form.property_type || '').trim()) {
+      setError('Property Type is required.');
+      return;
+    }
 
     setSavingProduct(true);
     setError('');
@@ -192,6 +204,8 @@ export default function RateCalculatorPage() {
 
       await saveApplicationStep(apiBaseUrl, effectiveApplicationId, 'calculator_inputs', {
         property_state: form.property_state,
+        property_type: form.property_type,
+        propertyType: form.property_type,
         est_fico: form.est_fico,
         refinance: form.refinance,
         owned_six_months: form.owned_six_months,
@@ -207,6 +221,7 @@ export default function RateCalculatorPage() {
 
       await saveApplicationStep(apiBaseUrl, effectiveApplicationId, 'calculator_results', {
         ...(metrics || {}),
+        property_type: form.property_type,
         purchase_price: purchasePrice,
         purchase_loan: purchaseLoanAmount || Number(metrics?.purchase_loan || 0),
         rehab_budget: rehabBudget,
@@ -243,6 +258,7 @@ export default function RateCalculatorPage() {
             metrics={metrics}
             loading={loading}
             savingProduct={savingProduct}
+            disableChoose={!String(form.property_type || '').trim()}
             onChooseProduct={handleChooseProduct}
           />
         </div>

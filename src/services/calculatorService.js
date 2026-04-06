@@ -173,6 +173,7 @@ function calculateLoanMetrics(input) {
 
   return {
     fico_policy: policy.fico,
+    property_type: input.property_type || input.propertyType || null,
     is_eligible: isEligible,
     errors,
     purchase_loan: roundMoney(purchaseLoanAmount),

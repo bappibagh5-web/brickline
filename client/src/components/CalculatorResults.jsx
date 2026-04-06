@@ -29,7 +29,8 @@ export default function CalculatorResults({
   metrics,
   loading,
   savingProduct,
-  onChooseProduct
+  onChooseProduct,
+  disableChoose = false
 }) {
   if (loading) {
     return (
@@ -98,7 +99,7 @@ export default function CalculatorResults({
                 </div>
                 <button
                   type="button"
-                  disabled={savingProduct || loading || !onChooseProduct}
+                  disabled={savingProduct || loading || disableChoose || !onChooseProduct}
                   onClick={() => onChooseProduct?.(product)}
                   className="h-9 min-w-[86px] rounded-md bg-[#0f766e] px-4 text-sm font-semibold text-white transition-colors hover:bg-[#0c655e] disabled:cursor-not-allowed disabled:opacity-60"
                 >

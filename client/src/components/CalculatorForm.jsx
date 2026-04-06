@@ -36,6 +36,15 @@ const FICO_OPTIONS = [
   'Over 780'
 ];
 
+const PROPERTY_TYPE_OPTIONS = [
+  'Single Family',
+  'Townhouse',
+  'Condo',
+  '2-4 unit',
+  '5-30 unit',
+  'Manufactured Home'
+];
+
 function FieldLabel({ children }) {
   return <span className="text-sm font-medium text-[#374151]">{children}</span>;
 }
@@ -57,7 +66,7 @@ export default function CalculatorForm({
     <section className="rounded-xl border border-[#e5e7eb] bg-white px-5 py-5 shadow-[0_2px_8px_rgba(0,0,0,0.04)] md:px-6">
       <h2 className="mb-4 text-[20px] font-semibold leading-tight text-[#1f2937]">Borrower Information</h2>
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
         <label className="grid gap-1.5">
           <FieldLabel>Property State</FieldLabel>
           <select
@@ -70,6 +79,21 @@ export default function CalculatorForm({
             {US_STATE_OPTIONS.map((stateCode) => (
               <option key={stateCode} value={stateCode}>
                 {stateCode}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="grid gap-1.5">
+          <FieldLabel>Property Type</FieldLabel>
+          <select
+            value={form.property_type}
+            onChange={(event) => onFormChange('property_type', event.target.value)}
+            className={inputClass}
+          >
+            <option value="">Select property type</option>
+            {PROPERTY_TYPE_OPTIONS.map((propertyTypeOption) => (
+              <option key={propertyTypeOption} value={propertyTypeOption}>
+                {propertyTypeOption}
               </option>
             ))}
           </select>

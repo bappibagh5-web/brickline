@@ -243,7 +243,7 @@ async function generateLoanSummaryPdf(application) {
     ['Interest-Only Period', `${selectedProduct.term || 12} months`],
     ['Preferred Signing Date', formatDate(data.preferred_signing_date)],
     ['Purpose', data.loan_program || 'Investment'],
-    ['Property Type', data.loan_program || 'Bridge'],
+    ['Property Type', data.property_type || data.calculator_inputs?.property_type || data.loan_program || 'N/A'],
     ['Occupancy', data.eligibility_confirmations?.non_owner_occupied ? 'Non-Owner Occupied' : 'Owner Occupied'],
     ['Purchase Price', formatCurrency(purchasePrice)],
     ['As-is Value', formatCurrency(toNumber(data.current_value, purchasePrice))],

@@ -756,7 +756,7 @@ function getReviewSummary(answers) {
   );
   const downPayment = Math.max(purchasePrice - purchaseLoanAmount, 0);
   const originationFee = totalLoanAmount * 0.02;
-  const serviceFee = 1495;
+  const serviceFee = 1295;
   const cashRequired = downPayment + originationFee + serviceFee;
   const resolvedRate = Number(
     effectiveSelectedProduct.rate
@@ -784,6 +784,11 @@ function getReviewSummary(answers) {
       || answers.purchase_property_full_address
       || answers.lead_property_full_address
       || answers.property_address
+      || 'N/A',
+    property_type:
+      answers.property_type
+      || answers.calculator_inputs?.property_type
+      || answers.submission_snapshot?.calculator?.property_type
       || 'N/A',
     total_loan_amount: totalLoanAmount,
     purchase_loan_amount: purchaseLoanAmount,
@@ -818,6 +823,7 @@ function ReviewSubmitStep({ summary, onGoBack, onSubmit, submitting, submitError
           <div className="border-b border-[#e7ebf4] pb-4">
             <p className="text-lg font-semibold text-[#1f2937]">{summary.entity_name}</p>
             <p className="mt-1 text-sm text-[#5f6b8f]">{summary.property_address}</p>
+            <p className="mt-1 text-sm text-[#5f6b8f]">Property Type: {summary.property_type}</p>
           </div>
 
           <div className="border-b border-[#e7ebf4] py-4">

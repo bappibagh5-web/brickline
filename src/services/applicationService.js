@@ -365,6 +365,7 @@ async function submitApplication(applicationId) {
   const submissionSnapshot = {
     calculator: {
       purchase_price: data.purchase_price || null,
+      property_type: data.property_type || null,
       rehab_budget: data.rehab_budget || null,
       comp_value: data.comp_value || null,
       purchase_advance_percent: data.purchase_advance_percent || null,
