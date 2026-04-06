@@ -370,6 +370,168 @@ function mapGooglePlaceToAddress(place, placeId) {
   });
 }
 
+function BorrowerAddressAutocompleteInput({
+  address,
+  setAddressField
+}) {
+  const requestIdRef = useRef(0);
+  const googleAutocompleteServiceRef = useRef(null);
+  const googlePlacesServiceRef = useRef(null);
+  const [query, setQuery] = useState(String(address?.address_line_1 || ''));
+  const [suggestions, setSuggestions] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [inputError, setInputError] = useState('');
+
+  useEffect(() => {
+    setQuery(String(address?.address_line_1 || ''));
+  }, [address?.address_line_1]);
+
+  useEffect(() => {
+    loadGooglePlacesLibrary()
+      .then(() => {
+        googleAutocompleteServiceRef.current = new window.google.maps.places.AutocompleteService();
+        googlePlacesServiceRef.current = new window.google.maps.places.PlacesService(document.createElement('div'));
+      })
+      .catch(() => {
+        googleAutocompleteServiceRef.current = null;
+        googlePlacesServiceRef.current = null;
+      });
+  }, []);
+
+  useEffect(() => {
+    const rawInput = String(query ?? '');
+    if (normalizeQueryText(rawInput).length < 3) {
+      setSuggestions([]);
+      setLoading(false);
+      return;
+    }
+
+    if (!googleAutocompleteServiceRef.current || !window.google?.maps?.places) {
+      return;
+    }
+
+    setLoading(true);
+    setInputError('');
+    const currentRequestId = ++requestIdRef.current;
+    const timer = setTimeout(async () => {
+      try {
+        const predictionRequest = {
+          input: rawInput,
+          types: ['address'],
+          componentRestrictions: { country: 'us' }
+        };
+
+        const googlePredictions = await new Promise((resolve, reject) => {
+          googleAutocompleteServiceRef.current.getPlacePredictions(predictionRequest, (predictions, status) => {
+            const placesStatus = window.google.maps.places.PlacesServiceStatus;
+            if (status === placesStatus.OK) {
+              resolve(Array.isArray(predictions) ? predictions : []);
+              return;
+            }
+            if (status === placesStatus.ZERO_RESULTS) {
+              resolve([]);
+              return;
+            }
+            reject(new Error('Failed to fetch address suggestions.'));
+          });
+        });
+
+        const nextSuggestions = rankSuggestions(
+          googlePredictions.map((item) => ({
+            place_id: item.place_id,
+            description: item.description,
+            main_text: item?.structured_formatting?.main_text || ''
+          })),
+          rawInput
+        );
+
+        if (currentRequestId !== requestIdRef.current) return;
+        setLoading(false);
+        setSuggestions(nextSuggestions);
+      } catch (error) {
+        if (currentRequestId !== requestIdRef.current) return;
+        setLoading(false);
+        setSuggestions([]);
+        setInputError(error.message || 'Failed to fetch address suggestions.');
+      }
+    }, 250);
+
+    return () => clearTimeout(timer);
+  }, [query]);
+
+  const handleSelectSuggestion = async (prediction) => {
+    const placeId = prediction?.place_id;
+    if (!placeId || !googlePlacesServiceRef.current || !window.google?.maps?.places) return;
+
+    setLoading(true);
+    setInputError('');
+    try {
+      const mapped = await new Promise((resolve, reject) => {
+        googlePlacesServiceRef.current.getDetails(
+          {
+            placeId,
+            fields: ['address_components', 'formatted_address', 'place_id']
+          },
+          (place, status) => {
+            const placesStatus = window.google.maps.places.PlacesServiceStatus;
+            if (status === placesStatus.OK && place) {
+              resolve(mapGooglePlaceToAddress(place, placeId));
+              return;
+            }
+            reject(new Error('Could not load address details.'));
+          }
+        );
+      });
+
+      const nextAddress = normalizeAddressValue(mapped || {});
+      setAddressField('address_line_1', nextAddress.address_line_1 || '');
+      setAddressField('city', nextAddress.city || '');
+      setAddressField('state', nextAddress.state || '');
+      setAddressField('zip', nextAddress.zip || '');
+      setQuery(nextAddress.address_line_1 || prediction.main_text || prediction.description || '');
+      setSuggestions([]);
+      setLoading(false);
+    } catch (error) {
+      setLoading(false);
+      setInputError(error.message || 'Could not load address details.');
+    }
+  };
+
+  return (
+    <div className="space-y-2">
+      <input
+        value={query}
+        onChange={(event) => {
+          const nextValue = event.target.value;
+          setQuery(nextValue);
+          setAddressField('address_line_1', nextValue);
+          setInputError('');
+        }}
+        placeholder="Current Borrower Address Line 1"
+        className="h-12 w-full rounded-none border border-[#9aa4ae] bg-[#f4f5f5] px-4 text-[16px] text-[#475569] placeholder:text-[#8d96b6] focus:border-[#4e6bf0] focus:bg-[#f3f6ff] focus:outline-none"
+      />
+      <div className="relative">
+        {loading ? <p className="text-xs text-[#5f6b8f]">Searching address...</p> : null}
+        {suggestions.length > 0 ? (
+          <div className="absolute z-20 mt-1 max-h-64 w-full overflow-auto border border-[#d6dbea] bg-white shadow-[0_8px_20px_rgba(0,0,0,0.08)]">
+            {suggestions.map((suggestion) => (
+              <button
+                key={suggestion.place_id}
+                type="button"
+                onClick={() => handleSelectSuggestion(suggestion)}
+                className="block w-full border-b border-[#eef2fb] px-3 py-2 text-left text-sm text-[#27345d] hover:bg-[#f4f7ff]"
+              >
+                {suggestion.description}
+              </button>
+            ))}
+          </div>
+        ) : null}
+      </div>
+      {inputError ? <p className="text-xs text-[#b63d3d]">{inputError}</p> : null}
+    </div>
+  );
+}
+
 function AddressAutocompleteField({ value, setValue }) {
   const requestIdRef = useRef(0);
   const googleAutocompleteServiceRef = useRef(null);
@@ -952,11 +1114,11 @@ function getBorrowerDetailsDefault(step, answers) {
     last_name: existing.last_name || answers.last_name || '',
     dob: existing.dob || answers.date_of_birth || '',
     address: {
-      address_line_1: String(existing.address?.address_line_1 || fallbackAddressLine1 || ''),
-      address_line_2: existing.address?.address_line_2 || fallbackAddressLine2 || '',
-      city: existing.address?.city || fallbackCity || '',
-      state: existing.address?.state || fallbackState || '',
-      zip: existing.address?.zip || fallbackZip || ''
+      address_line_1: String(existing.address?.address_line_1 ?? fallbackAddressLine1 ?? ''),
+      address_line_2: String(existing.address?.address_line_2 ?? fallbackAddressLine2 ?? ''),
+      city: String(existing.address?.city ?? fallbackCity ?? ''),
+      state: String(existing.address?.state ?? fallbackState ?? ''),
+      zip: String(existing.address?.zip ?? fallbackZip ?? '')
     },
     consents: {
       credit_pull: Boolean(existing.consents?.credit_pull),
@@ -1086,11 +1248,9 @@ function BorrowerDetailsStep({
               Individual Current Address
             </h3>
 
-            <input
-              value={value.address?.address_line_1 || ''}
-              onChange={(event) => setAddressField('address_line_1', event.target.value)}
-              placeholder="Current Borrower Address Line 1"
-              className="h-12 w-full rounded-none border border-[#9aa4ae] bg-[#f4f5f5] px-4 text-[16px] text-[#475569] placeholder:text-[#8d96b6] focus:border-[#4e6bf0] focus:bg-[#f3f6ff] focus:outline-none"
+            <BorrowerAddressAutocompleteInput
+              address={value.address || {}}
+              setAddressField={setAddressField}
             />
 
             <input
