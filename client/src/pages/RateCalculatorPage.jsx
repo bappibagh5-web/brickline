@@ -199,6 +199,7 @@ export default function RateCalculatorPage() {
         monthly_payment: product.monthly_payment
       };
       setStoredSelectedLoan(selectedLoan);
+      console.log('Selected Loan:', selectedLoan);
 
       const purchasePrice = parseCurrencyInput(form.purchase_price);
       const purchaseLoanAmount = parseCurrencyInput(form.purchase_loan_amount);

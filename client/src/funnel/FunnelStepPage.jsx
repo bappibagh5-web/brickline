@@ -2017,6 +2017,25 @@ export default function FunnelStepPage() {
     setSaving(true);
 
     try {
+      const selectedLoan = getStoredSelectedLoan();
+      console.log('Selected Loan:', selectedLoan);
+      if (selectedLoan && typeof selectedLoan === 'object') {
+        await fetchApi(`/applications/${applicationId}/save-step`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            step_key: 'selectedLoan',
+            data: {
+              term: selectedLoan.term ?? null,
+              rate: selectedLoan.rate ?? null,
+              monthlyPayment: selectedLoan.monthlyPayment ?? selectedLoan.monthly_payment ?? null
+            }
+          })
+        }).catch(() => null);
+      }
+
       const response = await fetchApi(`/applications/${applicationId}/submit`, {
         method: 'POST',
         headers: {
