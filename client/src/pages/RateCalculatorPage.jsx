@@ -3,9 +3,9 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { calculateLoan, getApplication, saveApplicationStep } from '../api/lendingApi.js';
 import CalculatorForm from '../components/CalculatorForm.jsx';
 import CalculatorResults from '../components/CalculatorResults.jsx';
+import FunnelHeader from '../components/FunnelHeader.jsx';
 import { getStoredApplicationId, setStoredApplicationId } from '../funnel/session.js';
 import { getApiBaseUrl } from '../lib/apiBaseUrl.js';
-import { BRAND_LOGOS } from '../lib/brandAssets.js';
 
 function formatCurrencyInput(value) {
   const cleaned = String(value ?? '').replace(/[^\d.]/g, '');
@@ -222,16 +222,9 @@ export default function RateCalculatorPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#f8fafc] px-4 py-8 md:py-12">
-      <header className="mb-8 flex h-12 items-center justify-between border-b border-[#d6d9db] bg-white px-5">
-        <img
-          src={BRAND_LOGOS.mainBlue}
-          alt="Brickline"
-          className="h-7 w-auto object-contain"
-        />
-        <p className="text-xs text-[#4b5563]">Questions? 1-844-415-4663</p>
-      </header>
-      <div className="mx-auto w-full max-w-[920px] space-y-4">
+    <div className="min-h-screen bg-[#f8fafc]">
+      <FunnelHeader />
+      <div className="mx-auto w-full max-w-[920px] space-y-4 px-4 py-8 md:py-12">
         <header>
           <h1 className="section-title">Estimate Your Bridge Rate</h1>
         </header>

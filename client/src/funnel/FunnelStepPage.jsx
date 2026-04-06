@@ -2,8 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { ChevronLeft } from 'lucide-react';
 import { Navigate, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
+import FunnelHeader from '../components/FunnelHeader.jsx';
 import { getApiBaseUrl } from '../lib/apiBaseUrl.js';
-import { BRAND_LOGOS } from '../lib/brandAssets.js';
 import { funnelConfig, funnelInitialStepId } from './config.js';
 import { useFunnel } from './FunnelContext.jsx';
 import { getNextRoute, getStepByRoute } from './utils.js';
@@ -1423,7 +1423,7 @@ export default function FunnelStepPage() {
   const [applicationId, setApplicationId] = useState(
     () => searchParams.get('applicationId') || getStoredApplicationId() || ''
   );
-  const [initializing, setInitializing] = useState(true);
+  const [initializing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [submitError, setSubmitError] = useState('');
@@ -1502,74 +1502,75 @@ export default function FunnelStepPage() {
   useEffect(() => {
     let ignore = false;
 
-    const syncApplicationSession = async () => {
+    const syncExistingApplicationSession = async () => {
+      const fromUrl = searchParams.get('applicationId');
+      const fromStorage = getStoredApplicationId();
+      const existingApplicationId = fromUrl || fromStorage;
+
+      if (!existingApplicationId) {
+        return;
+      }
+
+      if (ignore) return;
+      setApplicationId(existingApplicationId);
+      setStoredApplicationId(existingApplicationId);
+
       try {
-        const fromUrl = searchParams.get('applicationId');
-        const fromStorage = getStoredApplicationId();
-        const existingApplicationId = fromUrl || fromStorage;
-
-        if (existingApplicationId) {
-          if (ignore) return;
-          setApplicationId(existingApplicationId);
-          setStoredApplicationId(existingApplicationId);
-
-          const applicationResponse = await fetchApi(`/applications/${existingApplicationId}`);
-          if (applicationResponse.ok && !ignore) {
-            const applicationPayload = await applicationResponse.json().catch(() => ({}));
-            const applicationData = applicationPayload?.application_data;
-            if (applicationData && typeof applicationData === 'object') {
-              hydrateAnswers(applicationData);
-            }
+        const applicationResponse = await fetchApi(`/applications/${existingApplicationId}`);
+        if (applicationResponse.ok && !ignore) {
+          const applicationPayload = await applicationResponse.json().catch(() => ({}));
+          const applicationData = applicationPayload?.application_data;
+          if (applicationData && typeof applicationData === 'object') {
+            hydrateAnswers(applicationData);
           }
-
-          if (!fromUrl) {
-            const nextParams = new URLSearchParams(searchParams);
-            nextParams.set('applicationId', existingApplicationId);
-            setSearchParams(nextParams, { replace: true });
-          }
-          return;
         }
+      } catch (_syncError) {
+        // Keep the page interactive even if hydration fails.
+      }
 
-        const response = await fetchApi('/applications/start', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          }
-        });
-        const payload = await response.json().catch(() => ({}));
-
-        if (!response.ok) {
-          throw new Error(payload?.error || 'Failed to start application.');
-        }
-
-        const newApplicationId = payload.application_id;
-        if (!newApplicationId) {
-          throw new Error('Server did not return application_id.');
-        }
-
-        if (ignore) return;
-
-        setApplicationId(newApplicationId);
-        setStoredApplicationId(newApplicationId);
+      if (!fromUrl) {
         const nextParams = new URLSearchParams(searchParams);
-        nextParams.set('applicationId', newApplicationId);
+        nextParams.set('applicationId', existingApplicationId);
         setSearchParams(nextParams, { replace: true });
-      } catch (syncError) {
-        if (ignore) return;
-        setError(syncError.message);
-      } finally {
-        if (!ignore) {
-          setInitializing(false);
-        }
       }
     };
 
-    syncApplicationSession();
+    syncExistingApplicationSession();
 
     return () => {
       ignore = true;
     };
   }, [apiBaseUrl, hydrateAnswers, searchParams, setSearchParams]);
+
+  const ensureApplicationSession = async () => {
+    if (applicationId) {
+      return applicationId;
+    }
+
+    const response = await fetchApi('/applications/start', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+    const payload = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      throw new Error(payload?.error || 'Failed to start application.');
+    }
+
+    const newApplicationId = payload.application_id;
+    if (!newApplicationId) {
+      throw new Error('Server did not return application_id.');
+    }
+
+    setApplicationId(newApplicationId);
+    setStoredApplicationId(newApplicationId);
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.set('applicationId', newApplicationId);
+    setSearchParams(nextParams, { replace: true });
+    return newApplicationId;
+  };
 
   useEffect(() => {
     if (stepId !== 'accountCreationFlow' && checkEmailSaved) {
@@ -1753,19 +1754,31 @@ export default function FunnelStepPage() {
     if (!canProceed) return;
 
     setError('');
-    setSaving(true);
+    const nextRoute = getNextRoute(stepId, value, answers, {
+      isAuthenticated: Boolean(user)
+    });
+    if (!nextRoute) return;
 
-    try {
-      const payloadData = getStepPayload();
-      const shouldSaveStep = Boolean(payloadData && applicationId);
+    if (applicationId) {
+      navigate(`${nextRoute}?applicationId=${applicationId}`);
+    } else {
+      navigate(nextRoute);
+    }
 
-      if (isEmailCapture && typeof value === 'string') {
-        setStoredFunnelEmail(value);
-      }
+    void (async () => {
+      try {
+        const activeApplicationId = applicationId || await ensureApplicationSession();
+        const payloadData = getStepPayload();
+        const shouldSaveStep = Boolean(payloadData && activeApplicationId);
 
-      if (shouldSaveStep) {
+        if (isEmailCapture && typeof value === 'string') {
+          setStoredFunnelEmail(value);
+        }
+
+        if (!shouldSaveStep) return;
+
         if (stepId === 'fullName' && user?.id) {
-          await fetchApi(`/applications/${applicationId}/attach-user`, {
+          await fetchApi(`/applications/${activeApplicationId}/attach-user`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json'
@@ -1786,7 +1799,7 @@ export default function FunnelStepPage() {
               data: payloadData
             };
 
-        const response = await fetchApi(`/applications/${applicationId}/save-step`, {
+        const response = await fetchApi(`/applications/${activeApplicationId}/save-step`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'
@@ -1794,26 +1807,14 @@ export default function FunnelStepPage() {
           body: JSON.stringify(requestBody)
         });
 
-        const payload = await response.json().catch(() => ({}));
         if (!response.ok) {
-          setError(payload?.error || 'Failed to save step.');
-          return;
+          const payload = await response.json().catch(() => ({}));
+          console.error('Save failed', payload?.error || 'Failed to save step.');
         }
+      } catch (backgroundSaveError) {
+        console.error('Save failed', backgroundSaveError);
       }
-
-      const nextRoute = getNextRoute(stepId, value, answers, {
-        isAuthenticated: Boolean(user)
-      });
-      if (!nextRoute) return;
-
-      if (applicationId) {
-        navigate(`${nextRoute}?applicationId=${applicationId}`);
-        return;
-      }
-      navigate(nextRoute);
-    } finally {
-      setSaving(false);
-    }
+    })();
   };
 
   const handleOpenEmail = () => {
@@ -1851,13 +1852,27 @@ export default function FunnelStepPage() {
   };
 
   const handleSkip = async () => {
-    if (!step.allowSkip || saving || initializing) return;
+    if (!step.allowSkip) return;
 
     setError('');
-    setSaving(true);
-    try {
-      if (applicationId) {
-        await fetchApi(`/applications/${applicationId}/save-step`, {
+    const nextRoute = getNextRoute(stepId, value, answers, {
+      isAuthenticated: Boolean(user)
+    });
+
+    if (!nextRoute) return;
+
+    if (applicationId) {
+      navigate(`${nextRoute}?applicationId=${applicationId}`);
+    } else {
+      navigate(nextRoute);
+    }
+
+    void (async () => {
+      try {
+        const activeApplicationId = applicationId || await ensureApplicationSession();
+        if (!activeApplicationId) return;
+
+        const response = await fetchApi(`/applications/${activeApplicationId}/save-step`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'
@@ -1866,23 +1881,15 @@ export default function FunnelStepPage() {
             step_key: stepId,
             data: { skipped: true }
           })
-        }).catch(() => null);
+        });
+        if (!response.ok) {
+          const payload = await response.json().catch(() => ({}));
+          console.error('Save failed', payload?.error || 'Failed to save skipped step.');
+        }
+      } catch (backgroundSkipError) {
+        console.error('Save failed', backgroundSkipError);
       }
-
-      const nextRoute = getNextRoute(stepId, value, answers, {
-        isAuthenticated: Boolean(user)
-      });
-
-      if (!nextRoute) return;
-
-      if (applicationId) {
-        navigate(`${nextRoute}?applicationId=${applicationId}`);
-        return;
-      }
-      navigate(nextRoute);
-    } finally {
-      setSaving(false);
-    }
+    })();
   };
 
   const handleBack = () => {
@@ -1892,16 +1899,9 @@ export default function FunnelStepPage() {
 
   return (
     <div className="min-h-screen bg-[#f3f4f4] text-[#1f2937]">
-      <header className="flex h-12 items-center justify-between border-b border-[#d6d9db] bg-white px-5">
-        <img
-          src={BRAND_LOGOS.mainBlue}
-          alt="Brickline"
-          className="h-7 w-auto object-contain"
-        />
-        <p className="text-xs text-[#4b5563]">Questions? 1-844-415-4663</p>
-      </header>
+      <FunnelHeader />
 
-      <main className="grid min-h-[calc(100vh-48px-72px)] grid-cols-1 lg:grid-cols-12">
+      <main className="grid min-h-[calc(100vh-64px-72px)] grid-cols-1 lg:grid-cols-12">
         <section className="px-5 py-10 lg:col-span-7 lg:px-16 xl:px-20">
           <button
             type="button"
@@ -1920,7 +1920,6 @@ export default function FunnelStepPage() {
               </>
             ) : null}
             {error ? <p className="mt-3 text-sm font-semibold text-[#b63d3d]">{error}</p> : null}
-            {initializing ? <p className="mt-3 text-xs text-[#60709a]">Starting application session...</p> : null}
 
             <StepRenderer
               step={step}
@@ -1953,7 +1952,6 @@ export default function FunnelStepPage() {
                   <button
                     type="button"
                     onClick={handleSkip}
-                    disabled={initializing || saving}
                     className="inline-flex h-10 min-w-[88px] items-center justify-center rounded border border-[#9aa4ae] bg-white px-4 text-sm font-semibold text-[#475569] transition-all duration-150 hover:bg-[#f3f6ff] disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     Skip
@@ -1962,10 +1960,10 @@ export default function FunnelStepPage() {
                 <button
                   type="button"
                   onClick={handleNext}
-                  disabled={!canProceed || initializing || saving}
+                  disabled={!canProceed}
                   className="inline-flex h-10 min-w-[88px] items-center justify-center rounded bg-[#2f54eb] px-4 text-sm font-semibold text-white transition-all duration-150 hover:bg-[#2246d0] disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  {saving ? 'Saving...' : 'Next'}
+                  Next
                 </button>
               </div>
             ) : step.type === 'reviewSubmit' || step.type === 'borrowerDetails' ? null : (
