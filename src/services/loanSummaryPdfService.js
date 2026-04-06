@@ -22,6 +22,18 @@ function formatPercent(value) {
   return `${numeric.toFixed(2)}%`;
 }
 
+function formatPercentOrNA(value) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric) || numeric <= 0) return 'N/A';
+  return `${numeric.toFixed(2)}%`;
+}
+
+function formatMoneyOrNA(value, keepDecimals = false) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric) || numeric <= 0) return 'N/A';
+  return formatCurrency(numeric, keepDecimals);
+}
+
 function formatDate(value) {
   if (!value) return new Date().toLocaleDateString('en-US');
   const parsed = new Date(value);
@@ -55,7 +67,14 @@ function getEntityName(data) {
 
 function buildMetrics(data) {
   const savedMetrics = data.calculator_results || {};
-  const selectedProduct = data.selected_loan_product || {};
+  const selectedProductCandidates = [
+    data.selected_loan_product,
+    data.selectedLoan,
+    data.submission_snapshot?.selected_loan_product,
+    data.submission_snapshot?.selectedLoan,
+    data.submission_snapshot?.calculator?.selected_loan_product
+  ].filter((item) => item && typeof item === 'object');
+  const selectedProduct = selectedProductCandidates[0] || {};
 
   const calculated = calculateLoanMetrics({
     purchase_price: toNumber(data.purchase_price, 60000),
@@ -68,7 +87,7 @@ function buildMetrics(data) {
     rehab_factor: toNumber(data.rehab_factor, 0.6)
   });
 
-  return {
+  const merged = {
     ...calculated,
     ...savedMetrics,
     total_loan: toNumber(savedMetrics.total_loan, toNumber(calculated.total_loan, 0)),
@@ -79,6 +98,41 @@ function buildMetrics(data) {
     ltarv: toNumber(savedMetrics.ltarv, toNumber(calculated.ltarv, 0)),
     selected_product: selectedProduct
   };
+
+  const resolvedTerm = toNumber(
+    selectedProduct.term
+    ?? selectedProduct.termMonths
+    ?? data.selected_term
+    ?? 0,
+    0
+  );
+  const loanProducts = Array.isArray(merged.loan_products) ? merged.loan_products : [];
+  const matchedProduct = loanProducts.find((item) => toNumber(item?.term, 0) === resolvedTerm)
+    || loanProducts[0]
+    || {};
+
+  merged.selected_product = {
+    ...matchedProduct,
+    ...selectedProduct,
+    monthly_payment: toNumber(
+      selectedProduct.monthly_payment
+      ?? selectedProduct.monthlyPayment
+      ?? matchedProduct.monthly_payment
+      ?? matchedProduct.monthlyPayment
+      ?? 0,
+      0
+    ),
+    rate: toNumber(
+      selectedProduct.rate
+      ?? selectedProduct.interest_rate
+      ?? selectedProduct.annual_interest_rate
+      ?? matchedProduct.rate
+      ?? 0,
+      0
+    )
+  };
+
+  return merged;
 }
 
 function drawBrandHeader(doc, width, yStart) {
@@ -210,9 +264,9 @@ async function generateLoanSummaryPdf(application) {
   }
   y += 2;
 
-  writePairRow(doc, 'Monthly Payment', formatCurrency(selectedProduct.monthly_payment || 0, true), 62, pageWidth - 230, y, { boldValue: true, valueSize: 12, labelSize: 12 });
+  writePairRow(doc, 'Monthly Payment', formatMoneyOrNA(selectedProduct.monthly_payment, true), 62, pageWidth - 230, y, { boldValue: true, valueSize: 12, labelSize: 12 });
   y += 24;
-  writePairRow(doc, 'Interest Rate', formatPercent(selectedProduct.rate || 0), 62, pageWidth - 230, y, { boldValue: true, valueSize: 12, labelSize: 12 });
+  writePairRow(doc, 'Interest Rate', formatPercentOrNA(selectedProduct.rate), 62, pageWidth - 230, y, { boldValue: true, valueSize: 12, labelSize: 12 });
   y += 22;
 
   sectionDivider(doc, y, pageWidth);

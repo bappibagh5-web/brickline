@@ -409,7 +409,7 @@ async function submitApplication(applicationId) {
       borrower_details: data.borrower_details || null
     },
     signing_date: data.preferred_signing_date || null,
-    selected_loan_product: data.selected_loan_product || null
+    selected_loan_product: data.selected_loan_product || data.selectedLoan || null
   };
 
   const mergedApplicationData = {

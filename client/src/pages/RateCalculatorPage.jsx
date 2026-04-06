@@ -4,7 +4,11 @@ import { calculateLoan, getApplication, saveApplicationStep } from '../api/lendi
 import CalculatorForm from '../components/CalculatorForm.jsx';
 import CalculatorResults from '../components/CalculatorResults.jsx';
 import FunnelHeader from '../components/FunnelHeader.jsx';
-import { getStoredApplicationId, setStoredApplicationId } from '../funnel/session.js';
+import {
+  getStoredApplicationId,
+  setStoredApplicationId,
+  setStoredSelectedLoan
+} from '../funnel/session.js';
 import { getApiBaseUrl } from '../lib/apiBaseUrl.js';
 
 function formatCurrencyInput(value) {
@@ -188,6 +192,14 @@ export default function RateCalculatorPage() {
     setSavingProduct(true);
     setError('');
     try {
+      const selectedLoan = {
+        term: product.term,
+        rate: product.rate,
+        monthlyPayment: product.monthly_payment,
+        monthly_payment: product.monthly_payment
+      };
+      setStoredSelectedLoan(selectedLoan);
+
       const purchasePrice = parseCurrencyInput(form.purchase_price);
       const purchaseLoanAmount = parseCurrencyInput(form.purchase_loan_amount);
       const rehabBudget = parseCurrencyInput(form.rehab_budget);
@@ -197,9 +209,16 @@ export default function RateCalculatorPage() {
         term: product.term,
         rate: product.rate,
         monthly_payment: product.monthly_payment,
+        monthlyPayment: product.monthly_payment,
         total_loan: Number(metrics?.total_loan || 0),
         purchase_loan: purchaseLoanAmount || Number(metrics?.purchase_loan || 0),
         rehab_loan: Number(metrics?.rehab_loan || 0)
+      });
+
+      await saveApplicationStep(apiBaseUrl, effectiveApplicationId, 'selectedLoan', {
+        term: product.term,
+        rate: product.rate,
+        monthlyPayment: product.monthly_payment
       });
 
       await saveApplicationStep(apiBaseUrl, effectiveApplicationId, 'calculator_inputs', {

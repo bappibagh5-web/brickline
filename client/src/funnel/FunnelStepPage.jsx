@@ -10,7 +10,8 @@ import { getNextRoute, getStepByRoute } from './utils.js';
 import {
   getStoredApplicationId,
   setStoredApplicationId,
-  setStoredFunnelEmail
+  setStoredFunnelEmail,
+  getStoredSelectedLoan
 } from './session.js';
 
 const US_STATES = [
@@ -851,11 +852,29 @@ function getReviewSummary(answers) {
   const calculatorInputs = answers.calculator_inputs || {};
   const calculatorResults = answers.calculator_results || {};
   const selectedProduct = answers.selected_loan_product || {};
+  const storedSelectedLoan = getStoredSelectedLoan() || {};
+  const selectedLoanAlias = answers.selectedLoan || {};
   const selectedProductFallback = {
-    term: answers.term ?? answers.termMonths ?? answers.selected_term ?? null,
-    rate: answers.rate ?? answers.interest_rate ?? answers.annual_interest_rate ?? null,
+    term:
+      selectedLoanAlias.term
+      ?? storedSelectedLoan.term
+      ?? answers.term
+      ?? answers.termMonths
+      ?? answers.selected_term
+      ?? null,
+    rate:
+      selectedLoanAlias.rate
+      ?? storedSelectedLoan.rate
+      ?? answers.rate
+      ?? answers.interest_rate
+      ?? answers.annual_interest_rate
+      ?? null,
     monthly_payment:
-      answers.monthly_payment
+      selectedLoanAlias.monthlyPayment
+      ?? selectedLoanAlias.monthly_payment
+      ?? storedSelectedLoan.monthlyPayment
+      ?? storedSelectedLoan.monthly_payment
+      ?? answers.monthly_payment
       ?? answers.monthlyPayment
       ?? answers.estimated_monthly_payment
       ?? answers.estimatedMonthlyPayment
