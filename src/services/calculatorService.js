@@ -36,6 +36,7 @@ const TERM_SPREADS = {
   24: 1
 };
 const REFI_OWNED_SIX_MONTHS_DISCOUNT = 0.25;
+const PERSONAL_GUARANTEE_RATE_ADJUSTMENT = 1.0;
 
 const MIN_DISPLAY_LOAN = 40000;
 const MIN_LOAN_AMOUNT = 100000;
@@ -113,12 +114,19 @@ function getPricingOptions(input, loanAmount, ltcDecimal, isEligible) {
 
   const refinanceEnabled = isAffirmative(input.refinance);
   const ownedSixMonths = isAffirmative(input.owned_six_months);
+  const personallyGuaranteedRaw = String(
+    input.personally_guaranteed ?? input.personallyGuaranteed ?? 'Yes'
+  ).trim();
+  console.log('PG:', personallyGuaranteedRaw);
+  const personalGuaranteeAdjustment = personallyGuaranteedRaw === 'No'
+    ? PERSONAL_GUARANTEE_RATE_ADJUSTMENT
+    : 0.0;
   if (refinanceEnabled && ownedSixMonths) {
     base12 = Math.max(0, base12 - REFI_OWNED_SIX_MONTHS_DISCOUNT);
   }
 
   return [12, 18, 24].map((term) => {
-    const rate = Number((base12 + TERM_SPREADS[term]).toFixed(3));
+    const rate = Number((base12 + TERM_SPREADS[term] + personalGuaranteeAdjustment).toFixed(3));
     const annualRateDecimal = rate / 100;
     const monthlyPayment = roundMoney((loanAmount * annualRateDecimal) / 12);
     return {

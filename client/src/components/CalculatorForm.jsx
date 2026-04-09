@@ -71,7 +71,7 @@ export default function CalculatorForm({
     <section className="rounded-xl border border-[#e5e7eb] bg-white px-5 py-5 shadow-[0_2px_8px_rgba(0,0,0,0.04)] md:px-6">
       <h2 className="mb-4 text-[20px] font-semibold leading-tight text-[#1f2937]">Borrower Information</h2>
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
         <label className="grid gap-1.5">
           <FieldLabel>Property State</FieldLabel>
           <select
@@ -116,6 +116,17 @@ export default function CalculatorForm({
                 {ficoOption}
               </option>
             ))}
+          </select>
+        </label>
+        <label className="grid gap-1.5">
+          <FieldLabel>Personally Guaranteed</FieldLabel>
+          <select
+            value={form.personally_guaranteed}
+            onChange={(event) => onFormChange('personally_guaranteed', event.target.value)}
+            className={inputClass}
+          >
+            <option value="Yes">Yes</option>
+            <option value="No">No</option>
           </select>
         </label>
       </div>

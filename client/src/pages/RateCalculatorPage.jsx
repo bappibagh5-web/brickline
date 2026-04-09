@@ -44,6 +44,7 @@ export default function RateCalculatorPage() {
     property_state: 'FL',
     property_type: '',
     est_fico: '700-719',
+    personally_guaranteed: 'Yes',
     refinance: 'no',
     owned_six_months: 'yes',
     property_rehab: 'yes',
@@ -66,6 +67,12 @@ export default function RateCalculatorPage() {
         const application = await getApplication(apiBaseUrl, effectiveApplicationId);
         if (ignore) return;
         const data = application?.application_data || {};
+        const personallyGuaranteed = String(
+          data.personally_guaranteed
+          || data.personallyGuaranteed
+          || data.calculator_inputs?.personally_guaranteed
+          || 'Yes'
+        ).toLowerCase() === 'no' ? 'No' : 'Yes';
         setForm((prev) => ({
           ...prev,
           property_state:
@@ -79,6 +86,7 @@ export default function RateCalculatorPage() {
             data.calculator_inputs?.property_type ||
             prev.property_type,
           est_fico: data.est_fico || prev.est_fico,
+          personally_guaranteed: personallyGuaranteed,
           refinance: data.refinance || prev.refinance,
           owned_six_months: data.owned_six_months || prev.owned_six_months,
           property_rehab: data.property_rehab || prev.property_rehab,
@@ -151,10 +159,21 @@ export default function RateCalculatorPage() {
         const purchaseLoanAmount = parseCurrencyInput(form.purchase_loan_amount);
         const refinanceLoanAmount = parseCurrencyInput(form.refinance_loan_amount);
         const effectiveLoanAmount = form.refinance === 'yes' ? refinanceLoanAmount : purchaseLoanAmount;
+        const personallyGuaranteedValue = String(form.personally_guaranteed || '').trim();
+
+        if (!personallyGuaranteedValue) {
+          if (!ignore) {
+            setMetrics(null);
+            setError('Please select personally guaranteed to continue');
+            setLoading(false);
+          }
+          return;
+        }
 
         const result = await calculateLoan(apiBaseUrl, {
           fico_bucket: form.est_fico,
           est_fico: form.est_fico,
+          personally_guaranteed: personallyGuaranteedValue,
           property_type: form.property_type,
           propertyType: form.property_type,
           refinance: form.refinance,
@@ -200,6 +219,7 @@ export default function RateCalculatorPage() {
     form.refinance,
     form.owned_six_months,
     form.est_fico,
+    form.personally_guaranteed,
     form.property_rehab
   ]);
 
@@ -288,6 +308,7 @@ export default function RateCalculatorPage() {
         property_type: form.property_type,
         propertyType: form.property_type,
         est_fico: form.est_fico,
+        personally_guaranteed: form.personally_guaranteed,
         refinance: form.refinance,
         owned_six_months: form.owned_six_months,
         property_rehab: form.property_rehab,
@@ -307,6 +328,7 @@ export default function RateCalculatorPage() {
       await saveApplicationStep(apiBaseUrl, effectiveApplicationId, 'calculator_results', {
         ...(metrics || {}),
         property_type: form.property_type,
+        personally_guaranteed: form.personally_guaranteed,
         purchase_price: purchasePrice,
         purchase_loan: effectiveLoanAmount || Number(metrics?.purchase_loan || 0),
         purchase_loan_amount: purchaseLoanAmount,
