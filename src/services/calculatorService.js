@@ -117,8 +117,10 @@ function getPricingOptions(input, loanAmount, ltcDecimal, isEligible) {
   const personallyGuaranteedRaw = String(
     input.personally_guaranteed ?? input.personallyGuaranteed ?? 'Yes'
   ).trim();
-  console.log('PG:', personallyGuaranteedRaw);
-  const personalGuaranteeAdjustment = personallyGuaranteedRaw === 'No'
+  const personallyGuaranteedNormalized = personallyGuaranteedRaw.toLowerCase();
+  const isNotPersonallyGuaranteed = ['no', 'false', '0'].includes(personallyGuaranteedNormalized);
+  console.log('PG:', personallyGuaranteedRaw, '=> adjustment', isNotPersonallyGuaranteed ? 1 : 0);
+  const personalGuaranteeAdjustment = isNotPersonallyGuaranteed
     ? PERSONAL_GUARANTEE_RATE_ADJUSTMENT
     : 0.0;
   if (refinanceEnabled && ownedSixMonths) {
