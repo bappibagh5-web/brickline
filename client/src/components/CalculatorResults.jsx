@@ -30,7 +30,8 @@ export default function CalculatorResults({
   loading,
   savingProduct,
   onChooseProduct,
-  disableChoose = false
+  disableChoose = false,
+  externalErrors = []
 }) {
   if (loading) {
     return (
@@ -41,7 +42,10 @@ export default function CalculatorResults({
   }
 
   const products = Array.isArray(metrics?.loan_products) ? metrics.loan_products : [];
-  const errors = Array.isArray(metrics?.errors) ? metrics.errors : [];
+  const errors = [
+    ...(Array.isArray(externalErrors) ? externalErrors : []),
+    ...(Array.isArray(metrics?.errors) ? metrics.errors : [])
+  ];
   const hasMetrics = Boolean(metrics);
   const isEligible = Boolean(metrics?.is_eligible);
   const lowestRate = products.length > 0

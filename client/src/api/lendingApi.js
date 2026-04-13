@@ -63,7 +63,7 @@ export async function calculateLoan(apiBaseUrl, input) {
   const payload = await parseJson(response);
 
   if (!response.ok) {
-    throw new Error(payload?.error || 'Failed to calculate loan metrics.');
+    throw new Error(payload?.message || payload?.error || 'Failed to calculate loan metrics.');
   }
 
   if (!payload?.success || !payload?.data) {

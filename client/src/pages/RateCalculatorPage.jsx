@@ -56,6 +56,12 @@ export default function RateCalculatorPage() {
     comp_value: ''
   });
   const rehabCostInvalid = form.property_rehab === 'yes' && parseCurrencyInput(form.rehab_budget) < 1000;
+  const isFloridaCondo =
+    String(form.property_state || '').toUpperCase() === 'FL'
+    && String(form.property_type || '').trim() === 'Condo';
+  const resultErrors = isFloridaCondo
+    ? ['We do not currently finance this property type in Florida.']
+    : [];
 
   useEffect(() => {
     if (!effectiveApplicationId) return;
@@ -147,6 +153,14 @@ export default function RateCalculatorPage() {
       setLoading(true);
       setError('');
       try {
+        if (isFloridaCondo) {
+          if (!ignore) {
+            setMetrics(null);
+            setLoading(false);
+          }
+          return;
+        }
+
         const requiresRemainingMortgage = form.refinance === 'yes' && form.owned_six_months === 'yes';
         const remainingMortgageInput = String(form.remaining_mortgage || '').trim();
         const remainingMortgageAmount = parseCurrencyInput(form.remaining_mortgage);
@@ -252,7 +266,8 @@ export default function RateCalculatorPage() {
     form.owned_six_months,
     form.est_fico,
     form.personally_guaranteed,
-    form.property_rehab
+    form.property_rehab,
+    isFloridaCondo
   ]);
 
   const handleFormChange = (field, value) => {
@@ -294,6 +309,10 @@ export default function RateCalculatorPage() {
 
   const handleChooseProduct = async (product) => {
     if (!effectiveApplicationId || !product || loading || savingProduct) return;
+    if (isFloridaCondo) {
+      setError('We do not currently finance this property type in Florida.');
+      return;
+    }
     if (!String(form.property_type || '').trim()) {
       setError('Property Type is required.');
       return;
@@ -413,7 +432,8 @@ export default function RateCalculatorPage() {
             metrics={metrics}
             loading={loading}
             savingProduct={savingProduct}
-            disableChoose={!String(form.property_type || '').trim()}
+            disableChoose={!String(form.property_type || '').trim() || isFloridaCondo}
+            externalErrors={resultErrors}
             onChooseProduct={handleChooseProduct}
           />
         </div>

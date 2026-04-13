@@ -9,6 +9,15 @@ function createHttpError(status, message) {
 async function calculate(req, res, next) {
   try {
     const body = req.body || {};
+    const propertyState = String(body.property_state ?? body.state ?? '').toUpperCase();
+    const propertyType = String(body.property_type ?? body.propertyType ?? '').trim();
+
+    if (propertyState === 'FL' && propertyType === 'Condo') {
+      return res.status(400).json({
+        error: 'unsupported_property_type',
+        message: 'We do not currently finance this property type in Florida.'
+      });
+    }
 
     const requiredFields = [
       { name: 'purchase_price', aliases: ['purchase_price', 'estimated_property_value'] },
