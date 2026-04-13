@@ -178,7 +178,9 @@ export default function RateCalculatorPage() {
           propertyType: form.property_type,
           refinance: form.refinance,
           owned_six_months: form.owned_six_months,
+          prop_owned_6_months: form.owned_six_months,
           property_rehab: form.property_rehab,
+          estimated_property_value: parseCurrencyInput(form.purchase_price),
           purchase_price: parseCurrencyInput(form.purchase_price),
           loan_amount: effectiveLoanAmount,
           purchase_loan_amount: purchaseLoanAmount,
@@ -187,7 +189,7 @@ export default function RateCalculatorPage() {
             ? remainingMortgageAmount
             : 0,
           rehab_cost: form.property_rehab === 'yes' ? parseCurrencyInput(form.rehab_budget) : 0,
-          arv: parseCurrencyInput(form.comp_value)
+          arv: form.property_rehab === 'yes' ? parseCurrencyInput(form.comp_value) : 0
         });
         if (!ignore) {
           setMetrics(result);
@@ -238,7 +240,7 @@ export default function RateCalculatorPage() {
       const next = {
         ...prev,
         ...(field === 'property_rehab' && value === 'no'
-          ? { rehab_budget: '$0' }
+          ? { rehab_budget: '$0', comp_value: '$0' }
           : {}),
         [field]: nextValue
       };
@@ -311,7 +313,9 @@ export default function RateCalculatorPage() {
         personally_guaranteed: form.personally_guaranteed,
         refinance: form.refinance,
         owned_six_months: form.owned_six_months,
+        prop_owned_6_months: form.owned_six_months,
         property_rehab: form.property_rehab,
+        estimated_property_value: purchasePrice,
         purchase_price: purchasePrice,
         loan_amount: effectiveLoanAmount,
         purchase_loan: purchaseLoanAmount,
@@ -321,8 +325,8 @@ export default function RateCalculatorPage() {
         remaining_mortgage: form.refinance === 'yes' && form.owned_six_months === 'yes' ? remainingMortgage : 0,
         rehab_cost: rehabBudget,
         rehab_budget: rehabBudget,
-        arv: compValue,
-        comp_value: compValue
+        arv: form.property_rehab === 'yes' ? compValue : 0,
+        comp_value: form.property_rehab === 'yes' ? compValue : 0
       });
 
       await saveApplicationStep(apiBaseUrl, effectiveApplicationId, 'calculator_results', {
@@ -330,12 +334,15 @@ export default function RateCalculatorPage() {
         property_type: form.property_type,
         personally_guaranteed: form.personally_guaranteed,
         purchase_price: purchasePrice,
+        estimated_property_value: purchasePrice,
         purchase_loan: effectiveLoanAmount || Number(metrics?.purchase_loan || 0),
         purchase_loan_amount: purchaseLoanAmount,
         refinance_loan_amount: refinanceLoanAmount,
+        prop_owned_6_months: form.owned_six_months,
         remaining_mortgage: form.refinance === 'yes' && form.owned_six_months === 'yes' ? remainingMortgage : 0,
         rehab_budget: rehabBudget,
-        comp_value: compValue
+        comp_value: form.property_rehab === 'yes' ? compValue : 0,
+        arv: form.property_rehab === 'yes' ? compValue : 0
       });
 
       navigate(`/m/standardBorrower/eligibility?applicationId=${effectiveApplicationId}`);

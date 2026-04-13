@@ -35,8 +35,17 @@ const TERM_SPREADS = {
   18: 0.75,
   24: 1
 };
-const REFI_OWNED_SIX_MONTHS_DISCOUNT = 0.25;
 const PERSONAL_GUARANTEE_RATE_ADJUSTMENT = 1.0;
+const REFINANCE_SEASONING_RISK_ADJUSTMENT = 1.0;
+const MAX_AIV_LTV = 0.75;
+
+const FICO_TERM_RATE_OVERRIDES = {
+  '720-739': {
+    12: 9.25,
+    18: 9.75,
+    24: 10.25
+  }
+};
 
 const MIN_DISPLAY_LOAN = 40000;
 const MIN_LOAN_AMOUNT = 100000;
@@ -86,6 +95,10 @@ function getLoanAmount(input) {
   );
 }
 
+function getEstimatedPropertyValue(input) {
+  return toNumber(input.estimated_property_value ?? input.purchase_price ?? 0, 0);
+}
+
 function getRehabCost(input) {
   const rehabEnabled = String(input.property_rehab ?? input.rehab_enabled ?? 'yes').toLowerCase() !== 'no';
   if (!rehabEnabled) return 0;
@@ -105,30 +118,43 @@ function getPricingOptions(input, loanAmount, ltcDecimal, isEligible) {
   if (!isEligible) return [];
 
   const fico = input.fico_bucket ?? input.est_fico ?? input.fico;
-  const bucket = FICO_PRICING_BUCKET_MAP[fico];
-  if (!bucket) return [];
-
-  const band = getLeverageBand(ltcDecimal);
-  let base12 = BASE_RATE_12_MONTH[bucket]?.[band];
-  if (!Number.isFinite(base12)) return [];
-
   const refinanceEnabled = isAffirmative(input.refinance);
-  const ownedSixMonths = isAffirmative(input.owned_six_months);
+  const ownedSixMonths = isAffirmative(input.owned_six_months ?? input.prop_owned_6_months);
   const personallyGuaranteedRaw = String(
     input.personally_guaranteed ?? input.personallyGuaranteed ?? 'Yes'
   ).trim();
   const personallyGuaranteedNormalized = personallyGuaranteedRaw.toLowerCase();
   const isNotPersonallyGuaranteed = ['no', 'false', '0'].includes(personallyGuaranteedNormalized);
-  console.log('PG:', personallyGuaranteedRaw, '=> adjustment', isNotPersonallyGuaranteed ? 1 : 0);
-  const personalGuaranteeAdjustment = isNotPersonallyGuaranteed
-    ? PERSONAL_GUARANTEE_RATE_ADJUSTMENT
+  const personalGuaranteeAdjustment = isNotPersonallyGuaranteed ? PERSONAL_GUARANTEE_RATE_ADJUSTMENT : 0.0;
+  const refinanceSeasoningAdjustment = refinanceEnabled && !ownedSixMonths
+    ? REFINANCE_SEASONING_RISK_ADJUSTMENT
     : 0.0;
-  if (refinanceEnabled && ownedSixMonths) {
-    base12 = Math.max(0, base12 - REFI_OWNED_SIX_MONTHS_DISCOUNT);
+
+  const overrideRates = FICO_TERM_RATE_OVERRIDES[fico];
+  if (overrideRates) {
+    return [12, 18, 24].map((term) => {
+      const baseRate = toNumber(overrideRates[term], 0);
+      const rate = Number((baseRate + personalGuaranteeAdjustment + refinanceSeasoningAdjustment).toFixed(3));
+      const annualRateDecimal = rate / 100;
+      const monthlyPayment = roundMoney((loanAmount * annualRateDecimal) / 12);
+      return {
+        term,
+        rate,
+        monthly_payment: monthlyPayment
+      };
+    });
   }
 
+  const bucket = FICO_PRICING_BUCKET_MAP[fico];
+  if (!bucket) return [];
+
+  const band = getLeverageBand(ltcDecimal);
+  const base12 = BASE_RATE_12_MONTH[bucket]?.[band];
+  if (!Number.isFinite(base12)) return [];
+
   return [12, 18, 24].map((term) => {
-    const rate = Number((base12 + TERM_SPREADS[term] + personalGuaranteeAdjustment).toFixed(3));
+    const baseRate = base12 + TERM_SPREADS[term];
+    const rate = Number((baseRate + personalGuaranteeAdjustment + refinanceSeasoningAdjustment).toFixed(3));
     const annualRateDecimal = rate / 100;
     const monthlyPayment = roundMoney((loanAmount * annualRateDecimal) / 12);
     return {
@@ -143,41 +169,56 @@ function calculateLoanMetrics(input) {
   const fico = input.fico_bucket ?? input.est_fico ?? input.fico ?? 'Below 600';
   const policy = getPolicy(fico);
 
-  const purchasePrice = toNumber(input.purchase_price, 0);
+  const purchasePrice = getEstimatedPropertyValue(input);
   const loanAmount = getLoanAmount(input);
-  const rehabCost = getRehabCost(input);
-  const arv = getArv(input);
+  const rehabEnabled = String(input.property_rehab ?? input.rehab_enabled ?? 'yes').toLowerCase() !== 'no';
+  const isRefinance = isAffirmative(input.refinance);
+  const rehabCost = rehabEnabled ? getRehabCost(input) : 0;
+  const arv = rehabEnabled ? getArv(input) : 0;
 
   const purchaseLoanAmount = loanAmount;
   const totalLoan = purchaseLoanAmount + rehabCost;
   const totalCost = purchasePrice + rehabCost;
   const ltcDecimal = purchasePrice > 0 ? purchaseLoanAmount / purchasePrice : 0;
-  const ltarvDecimal = arv > 0 ? totalLoan / arv : 0;
+  const ltarvDecimal = rehabEnabled && arv > 0 ? totalLoan / arv : 0;
+  const aivLtvDecimal = purchasePrice > 0 ? loanAmount / purchasePrice : 0;
   const spread = arv - totalLoan;
 
-  const qualifiedMaxLoanDecimal = Math.max(
-    0,
-    Math.min(
-      purchasePrice * policy.maxLTC,
-      (arv * policy.maxLTARV) - rehabCost
-    )
-  );
+  let qualifiedMaxLoanDecimal = Math.max(0, purchasePrice * policy.maxLTC);
+  if (rehabEnabled && arv > 0) {
+    qualifiedMaxLoanDecimal = Math.max(
+      0,
+      Math.min(
+        purchasePrice * policy.maxLTC,
+        (arv * policy.maxLTARV) - rehabCost
+      )
+    );
+  }
+  if (isRefinance && !rehabEnabled) {
+    qualifiedMaxLoanDecimal = Math.max(0, Math.min(qualifiedMaxLoanDecimal, purchasePrice * MAX_AIV_LTV));
+  }
 
   const errors = [];
 
-  if (ltarvDecimal > policy.maxLTARV) {
+  if (isRefinance && !rehabEnabled && aivLtvDecimal > MAX_AIV_LTV) {
     errors.push(
-      `Either decrease Loan Amount Requested or increase the After Repair Value. After-Repair-Value Loan-to-Value (ARV LTV) is ${roundPercent(ltarvDecimal)}%, but must be no more than ${roundPercent(policy.maxLTARV)}%`
+      'Reduce Initial Loan Amount. As-Is Loan-To-Value (AIV LTV) exceeds 75%'
     );
   }
 
-  if (ltcDecimal > policy.maxLTC) {
+  if (!(isRefinance && !rehabEnabled) && ltcDecimal > policy.maxLTC) {
     errors.push(
       `Reduce either Purchase Price or Initial Loan Amount. Loan-To-Cost (LTC) is ${roundPercent(ltcDecimal)}%, but must be no more than ${roundPercent(policy.maxLTC)}%`
     );
   }
 
-  if ((purchasePrice + rehabCost) > arv && arv > 0) {
+  if (rehabEnabled && ltarvDecimal > policy.maxLTARV) {
+    errors.push(
+      `Either decrease Loan Amount Requested or increase the After Repair Value. After-Repair-Value Loan-to-Value (ARV LTV) is ${roundPercent(ltarvDecimal)}%, but must be no more than ${roundPercent(policy.maxLTARV)}%`
+    );
+  }
+
+  if (rehabEnabled && (purchasePrice + rehabCost) > arv && arv > 0) {
     errors.push('Adjust your Rehab Amount. Based on ARV and cost, the rehab cost is too high.');
   }
 
@@ -202,8 +243,10 @@ function calculateLoanMetrics(input) {
     total_loan: roundMoney(totalLoan),
     total_cost: roundMoney(totalCost),
     arv: roundMoney(arv),
-    ltc: roundPercent(ltcDecimal),
-    ltarv: roundPercent(ltarvDecimal),
+    ltc: rehabEnabled ? roundPercent(ltcDecimal) : null,
+    ltarv: rehabEnabled ? roundPercent(ltarvDecimal) : null,
+    aiv_ltv: roundPercent(aivLtvDecimal),
+    metric_mode: rehabEnabled ? 'rehab' : 'as_is',
     spread: roundMoney(spread),
     min_loan: roundMoney(MIN_DISPLAY_LOAN),
     max_loan: roundMoney(qualifiedMaxLoanDecimal),

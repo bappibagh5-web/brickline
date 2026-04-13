@@ -56,6 +56,7 @@ export default function CalculatorForm({
   loading
 }) {
   const isRehabDisabled = form.property_rehab === 'no';
+  const showArvField = !isRehabDisabled;
   const isRefinance = form.refinance === 'yes';
   const ownedSixMonths = form.owned_six_months === 'yes';
   const showPurchaseLoanAmount = !isRefinance;
@@ -239,23 +240,33 @@ export default function CalculatorForm({
             }`}
           />
         </label>
-        <label className="grid gap-1.5">
-          <FieldLabel>After Repair Value (ARV)</FieldLabel>
-          <input
-            type="text"
-            value={form.comp_value}
-            onChange={(event) => onFormChange('comp_value', event.target.value)}
-            className={inputClass}
-          />
-        </label>
+        {showArvField ? (
+          <label className="grid gap-1.5">
+            <FieldLabel>After Repair Value (ARV)</FieldLabel>
+            <input
+              type="text"
+              value={form.comp_value}
+              onChange={(event) => onFormChange('comp_value', event.target.value)}
+              className={inputClass}
+            />
+          </label>
+        ) : null}
         <div className="pt-7 text-xs leading-5 text-[#6b7280]">
-          <p>
-            Loan-to-cost is <span className="font-semibold text-[#374151]">{formatPercent(metrics?.ltc)}</span>.
-          </p>
-          <p>
-            After-repair loan-to-value is{' '}
-            <span className="font-semibold text-[#374151]">{formatPercent(metrics?.ltarv)}</span>.
-          </p>
+          {showArvField ? (
+            <>
+              <p>
+                Loan-to-cost is <span className="font-semibold text-[#374151]">{formatPercent(metrics?.ltc)}</span>.
+              </p>
+              <p>
+                After-repair loan-to-value is{' '}
+                <span className="font-semibold text-[#374151]">{formatPercent(metrics?.ltarv)}</span>.
+              </p>
+            </>
+          ) : (
+            <p>
+              Loan-to-value is <span className="font-semibold text-[#374151]">{formatPercent(metrics?.aiv_ltv)}</span>.
+            </p>
+          )}
         </div>
       </div>
 

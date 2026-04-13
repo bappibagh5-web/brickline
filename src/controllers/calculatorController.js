@@ -11,9 +11,8 @@ async function calculate(req, res, next) {
     const body = req.body || {};
 
     const requiredFields = [
-      { name: 'purchase_price', aliases: ['purchase_price'] },
+      { name: 'purchase_price', aliases: ['purchase_price', 'estimated_property_value'] },
       { name: 'loan_amount', aliases: ['loan_amount', 'purchase_loan', 'purchase_loan_amount', 'refinance_loan'] },
-      { name: 'arv', aliases: ['arv', 'comp_value'] }
     ];
 
     const missing = requiredFields
@@ -21,6 +20,10 @@ async function calculate(req, res, next) {
       .map((field) => field.name);
 
     if ((body.property_rehab ?? 'yes') !== 'no') {
+      const hasArv = ['arv', 'comp_value'].some((alias) => body[alias] !== undefined && body[alias] !== null && body[alias] !== '');
+      if (!hasArv) {
+        missing.push('arv');
+      }
       const hasRehabCost = ['rehab_cost', 'rehab_budget'].some((alias) => body[alias] !== undefined && body[alias] !== null && body[alias] !== '');
       if (!hasRehabCost) {
         missing.push('rehab_cost');
