@@ -4,6 +4,10 @@ import { BRAND_LOGOS } from '../lib/brandAssets.js';
 function RightPanel() {
   return (
     <aside className="relative h-[280px] w-full overflow-hidden rounded-b-[20px] bg-[radial-gradient(circle_at_20%_10%,#1e48ff_0%,#071564_48%,#030a36_100%)] lg:sticky lg:top-0 lg:h-full lg:w-[40%] lg:min-w-[340px] lg:rounded-b-none lg:rounded-r-[20px]">
+      <div
+        className="pointer-events-none absolute inset-y-0 left-0 hidden w-10 bg-white/95 lg:block"
+        style={{ clipPath: 'polygon(0 0, 100% 0, 42% 100%, 0 100%)' }}
+      />
       <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:36px_36px]" />
 
       <div className="relative z-10 flex h-full flex-col px-5 py-4 lg:px-7 lg:py-6">
