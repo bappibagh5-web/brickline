@@ -3,7 +3,7 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { calculateLoan, getApplication, saveApplicationStep } from '../api/lendingApi.js';
 import CalculatorForm from '../components/CalculatorForm.jsx';
 import CalculatorResults from '../components/CalculatorResults.jsx';
-import FunnelHeader from '../components/FunnelHeader.jsx';
+import OnboardingLayout from '../funnel/OnboardingLayout.jsx';
 import {
   getStoredApplicationId,
   setStoredApplicationId,
@@ -381,7 +381,7 @@ export default function RateCalculatorPage() {
       }
       await saveApplicationStep(apiBaseUrl, effectiveApplicationId, 'calculator_results', calculatorResultsPayload);
 
-      navigate(`/m/standardBorrower/eligibility?applicationId=${effectiveApplicationId}`);
+      navigate(`/m/standardBorrower/reviewSubmit?applicationId=${effectiveApplicationId}`);
     } catch (saveError) {
       setError(saveError.message || 'Failed to save selected loan product.');
     } finally {
@@ -390,16 +390,21 @@ export default function RateCalculatorPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#f8fafc]">
-      <FunnelHeader />
-      <div className="mx-auto w-full max-w-[920px] space-y-4 px-4 py-8 md:py-12">
+    <OnboardingLayout
+      stepNumber={8}
+      onBack={() => navigate(-1)}
+      disableBack={false}
+    >
+      <div className="space-y-3">
         <header>
-          <h1 className="section-title">Estimate Your Bridge Rate</h1>
+          <h1 className="text-[clamp(34px,3.1vw,48px)] font-bold leading-tight tracking-[-0.02em] text-[#0b1f57]">
+            Estimate Your Bridge Rate
+          </h1>
         </header>
 
         {pageLoading ? <p className="text-sm text-[#60709a]">Loading application...</p> : null}
 
-        <div className="space-y-4">
+        <div className="space-y-3">
           <CalculatorForm
             form={form}
             onFormChange={handleFormChange}
@@ -417,6 +422,6 @@ export default function RateCalculatorPage() {
           />
         </div>
       </div>
-    </div>
+    </OnboardingLayout>
   );
 }

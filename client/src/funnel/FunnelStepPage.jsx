@@ -14,6 +14,8 @@ import StateStep from './steps/StateStep.jsx';
 import LeadStep from './steps/LeadStep.jsx';
 import EntityStep from './steps/EntityStep.jsx';
 import EntityNameStep from './steps/EntityNameStep.jsx';
+import AddressStep from './steps/AddressStep.jsx';
+import SubmissionStep from './steps/SubmissionStep.jsx';
 import {
   getStoredApplicationId,
   setStoredApplicationId,
@@ -38,7 +40,9 @@ const ONBOARDING_STEP_ORDER = {
   standardEntityQuestion: 5,
   proEntityQuestion: 5,
   standardEntityName: 6,
-  proEntityName: 6
+  proEntityName: 6,
+  propertyAddress: 7,
+  reviewSubmit: 9
 };
 
 const US_STATE_NAME_TO_CODE = {
@@ -2304,6 +2308,31 @@ export default function FunnelStepPage() {
             title={step.title || ''}
             value={value}
             setValue={setStepValue}
+          />
+        ) : null}
+
+        {stepId === 'propertyAddress' ? (
+          <AddressStep
+            {...sharedProps}
+            title={step.title || ''}
+            description={step.description || ''}
+            addressField={
+              <AddressAutocompleteField
+                value={value}
+                setValue={setStepValue}
+              />
+            }
+          />
+        ) : null}
+
+        {stepId === 'reviewSubmit' ? (
+          <SubmissionStep
+            summary={value}
+            onGoBack={handleBack}
+            onSubmit={handleSubmitForReview}
+            submitting={saving}
+            submitError={submitError}
+            submitSuccess={submitSuccess}
           />
         ) : null}
 

@@ -67,13 +67,13 @@ export default function CalculatorForm({
     form.property_state && !US_STATE_OPTIONS.includes(String(form.property_state).toUpperCase())
   );
   const inputClass =
-    'h-10 w-full rounded-md border border-[#d1d5db] bg-white px-3 text-sm text-[#1f2937] transition-colors focus:border-[#9ca3af] focus:outline-none';
+    'h-9 w-full rounded-md border border-[#d1d5db] bg-white px-3 text-sm text-[#1f2937] transition-colors focus:border-[#9ca3af] focus:outline-none';
 
   return (
-    <section className="rounded-xl border border-[#e5e7eb] bg-white px-5 py-5 shadow-[0_2px_8px_rgba(0,0,0,0.04)] md:px-6">
-      <h2 className="mb-4 text-[20px] font-semibold leading-tight text-[#1f2937]">Borrower Information</h2>
+    <section className="rounded-xl border border-[#e5e7eb] bg-white px-4 py-4 shadow-[0_2px_8px_rgba(0,0,0,0.04)] sm:px-5">
+      <h2 className="mb-3 text-lg font-semibold leading-tight text-[#1f2937]">Borrower Information</h2>
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <label className="grid gap-1.5">
           <FieldLabel>Property State</FieldLabel>
           <select
@@ -133,7 +133,7 @@ export default function CalculatorForm({
         </label>
       </div>
 
-      <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-[1fr_1fr_1fr_220px]">
+      <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_180px]">
         <label className="grid gap-1.5">
           <FieldLabel>Refinance</FieldLabel>
           <select
@@ -176,7 +176,7 @@ export default function CalculatorForm({
             />
           </label>
         ) : null}
-        <div className="pt-7 text-xs leading-5 text-[#6b7280]">
+        <div className="pt-1 text-xs leading-5 text-[#6b7280] lg:pt-6">
           <p>You qualify for a loan between</p>
           <p className="font-semibold text-[#374151]">
             {formatMoney(metrics?.min_loan)} to {formatMoney(metrics?.max_loan)}.
@@ -185,7 +185,7 @@ export default function CalculatorForm({
       </div>
 
       {isRefinance ? (
-        <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-[1fr_1fr_1fr_220px]">
+        <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_180px]">
           <label className="grid gap-1.5">
             <FieldLabel>Prop. Owned ≥ 6 Months</FieldLabel>
             <select
@@ -211,7 +211,7 @@ export default function CalculatorForm({
         </div>
       ) : null}
 
-      <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-[1fr_1fr_1fr_220px]">
+      <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_180px]">
         <label className="grid gap-1.5">
           <FieldLabel>Property Rehab</FieldLabel>
           <select
@@ -254,7 +254,7 @@ export default function CalculatorForm({
             />
           </label>
         ) : null}
-        <div className="pt-7 text-xs leading-5 text-[#6b7280]">
+        <div className="pt-1 text-xs leading-5 text-[#6b7280] lg:pt-6">
           {showArvField ? (
             <>
               {metrics?.ltc !== null && metrics?.ltc !== undefined ? (
@@ -281,10 +281,10 @@ export default function CalculatorForm({
         </div>
       </div>
 
-      <p className="mt-5 text-[20px] font-semibold leading-tight text-[#1f2937]">
+      <p className="mt-4 text-[28px] font-semibold leading-tight text-[#1f2937]">
         Total Loan Amount: {formatMoney(metrics?.total_loan)}
       </p>
-      <p className="mt-1.5 text-sm text-[#6b7280]">
+      <p className="mt-1 text-xs text-[#6b7280]">
         {loading ? 'Rates are being calculated...' : 'Rates have been calculated'}
       </p>
     </section>

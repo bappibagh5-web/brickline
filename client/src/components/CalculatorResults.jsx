@@ -18,9 +18,9 @@ function ResultSkeleton() {
   return (
     <div className="space-y-2">
       <div className="h-5 w-4/5 animate-pulse rounded bg-[#eef2f7]" />
-      <div className="h-[84px] animate-pulse rounded border border-[#e5e7eb] bg-white" />
-      <div className="h-[84px] animate-pulse rounded border border-[#e5e7eb] bg-white" />
-      <div className="h-[84px] animate-pulse rounded border border-[#e5e7eb] bg-white" />
+      <div className="h-[72px] animate-pulse rounded border border-[#e5e7eb] bg-white" />
+      <div className="h-[72px] animate-pulse rounded border border-[#e5e7eb] bg-white" />
+      <div className="h-[72px] animate-pulse rounded border border-[#e5e7eb] bg-white" />
     </div>
   );
 }
@@ -66,7 +66,7 @@ export default function CalculatorResults({
           </ul>
         </div>
       ) : null}
-      <p className="mb-2 text-base text-[#4b5563]">
+      <p className="mb-2 text-sm text-[#4b5563]">
         Based on your provided information, you've qualified for the following options:
       </p>
       {hasMetrics && !isEligible ? (
@@ -75,7 +75,7 @@ export default function CalculatorResults({
           <p className="mt-1 text-sm text-[#6b7280]">Adjust your information to see more.</p>
         </div>
       ) : null}
-      <div className="space-y-1.5">
+      <div className="space-y-1">
         {products.map((product) => {
           const isLowestRate = Number(product.rate) === lowestRate;
           return (
@@ -86,28 +86,28 @@ export default function CalculatorResults({
               }`}
             >
               {isLowestRate ? (
-                <div className="border-b border-[#d7efe8] bg-[#dff4ee] px-4 py-1 text-[11px] font-semibold uppercase tracking-wide text-[#0b5f56]">
+                <div className="border-b border-[#d7efe8] bg-[#dff4ee] px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-[#0b5f56]">
                   Lowest Rate
                 </div>
               ) : null}
-              <div className="grid grid-cols-1 items-center gap-3 px-4 py-3.5 md:grid-cols-[1.2fr_1fr_1fr_auto]">
+              <div className="grid grid-cols-1 items-center gap-2 px-3 py-2.5 sm:grid-cols-[1.2fr_1fr_1fr_auto]">
                 <div>
                   <p className="text-xs text-[#6b7280]">Rate Type</p>
-                  <p className="text-[18px] font-semibold leading-tight text-[#1f2937]">{product.term} Months</p>
+                  <p className="text-base font-semibold leading-tight text-[#1f2937]">{product.term} Months</p>
                 </div>
                 <div>
                   <p className="text-xs text-[#6b7280]">Rate</p>
-                  <p className="text-[18px] font-semibold leading-tight text-[#1f2937]">{Number(product.rate).toFixed(3)}%</p>
+                  <p className="text-base font-semibold leading-tight text-[#1f2937]">{Number(product.rate).toFixed(3)}%</p>
                 </div>
                 <div>
                   <p className="text-xs text-[#6b7280]">Est. Monthly Payment</p>
-                  <p className="text-[18px] font-semibold leading-tight text-[#1f2937]">{formatMoney(product.monthly_payment, { cents: true })}</p>
+                  <p className="text-base font-semibold leading-tight text-[#1f2937]">{formatMoney(product.monthly_payment, { cents: true })}</p>
                 </div>
                 <button
                   type="button"
                   disabled={savingProduct || loading || disableChoose || !onChooseProduct}
                   onClick={() => onChooseProduct?.(product)}
-                  className="h-9 min-w-[86px] rounded-md bg-[#0f766e] px-4 text-sm font-semibold text-white transition-colors hover:bg-[#0c655e] disabled:cursor-not-allowed disabled:opacity-60"
+                  className="h-8 min-w-[78px] rounded-md bg-[#0f766e] px-3 text-xs font-semibold text-white transition-colors hover:bg-[#0c655e] disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {savingProduct ? 'Saving...' : 'Choose'}
                 </button>
