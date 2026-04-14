@@ -20,6 +20,7 @@ import CheckEmailStep from './steps/CheckEmailStep.jsx';
 import {
   getStoredApplicationId,
   setStoredApplicationId,
+  getStoredFunnelEmail,
   setStoredFunnelEmail,
   getStoredBorrower,
   setStoredBorrower,
@@ -1750,6 +1751,20 @@ export default function FunnelStepPage() {
   const { stepId, step } = current;
   const value = getStepValue(step, answers);
   const onboardingStepNumber = ONBOARDING_STEP_ORDER[stepId] || null;
+  const storedBorrower = getStoredBorrower() || {};
+  const checkEmailFirstName = String(
+    answers?.first_name
+    || answers?.borrower?.firstName
+    || storedBorrower?.firstName
+    || ''
+  ).trim();
+  const checkEmailAddress = String(
+    answers?.email
+    || answers?.borrower?.email
+    || getStoredFunnelEmail()
+    || storedBorrower?.email
+    || ''
+  ).trim();
 
   const onboardingSubtitle = (() => {
     if (stepId === 'loanProgram') {
@@ -2319,11 +2334,13 @@ export default function FunnelStepPage() {
         ) : null}
 
         {stepId === 'accountCreationFlow' ? (
-          <CheckEmailStep
-            title={step.title || ''}
-            description={step.description || ''}
-            onOpenEmail={handleOpenEmail}
-          />
+          <div className="pt-3 lg:pt-4">
+            <CheckEmailStep
+              firstName={checkEmailFirstName}
+              email={checkEmailAddress}
+              onOpenEmail={handleOpenEmail}
+            />
+          </div>
         ) : null}
 
         {(stepId === 'standardEntityQuestion' || stepId === 'proEntityQuestion') ? (
