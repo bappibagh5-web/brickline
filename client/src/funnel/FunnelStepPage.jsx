@@ -409,6 +409,7 @@ function BorrowerAddressAutocompleteInput({
   setAddressField
 }) {
   const requestIdRef = useRef(0);
+  const suppressNextSearchRef = useRef(false);
   const googleAutocompleteServiceRef = useRef(null);
   const googlePlacesServiceRef = useRef(null);
   const [query, setQuery] = useState(String(address?.address_line_1 || ''));
@@ -434,6 +435,14 @@ function BorrowerAddressAutocompleteInput({
 
   useEffect(() => {
     const rawInput = String(query ?? '');
+
+    if (suppressNextSearchRef.current) {
+      suppressNextSearchRef.current = false;
+      setLoading(false);
+      setSuggestions([]);
+      return;
+    }
+
     if (normalizeQueryText(rawInput).length < 3) {
       setSuggestions([]);
       setLoading(false);
@@ -497,6 +506,9 @@ function BorrowerAddressAutocompleteInput({
     const placeId = prediction?.place_id;
     if (!placeId || !googlePlacesServiceRef.current || !window.google?.maps?.places) return;
 
+    suppressNextSearchRef.current = true;
+    requestIdRef.current += 1;
+    setSuggestions([]);
     setLoading(true);
     setInputError('');
     try {
@@ -568,6 +580,7 @@ function BorrowerAddressAutocompleteInput({
 
 function AddressAutocompleteField({ value, setValue }) {
   const requestIdRef = useRef(0);
+  const suppressNextSearchRef = useRef(false);
   const googleAutocompleteServiceRef = useRef(null);
   const googlePlacesServiceRef = useRef(null);
   const lastSyncedPlaceIdRef = useRef('');
@@ -615,6 +628,14 @@ function AddressAutocompleteField({ value, setValue }) {
 
   useEffect(() => {
     const rawInput = String(query ?? '');
+
+    if (suppressNextSearchRef.current) {
+      suppressNextSearchRef.current = false;
+      setLoading(false);
+      setSuggestions([]);
+      return;
+    }
+
     if (normalizeQueryText(rawInput).length < 3) {
       setSuggestions([]);
       setLoading(false);
@@ -686,6 +707,9 @@ function AddressAutocompleteField({ value, setValue }) {
     const placeId = prediction?.place_id;
     if (!placeId) return;
 
+    suppressNextSearchRef.current = true;
+    requestIdRef.current += 1;
+    setSuggestions([]);
     userTypingRef.current = false;
     setLoading(true);
     setInputError('');
