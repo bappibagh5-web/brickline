@@ -47,7 +47,8 @@ export default function OnboardingLayout({
   children,
   onBack,
   disableBack,
-  stepNumber
+  stepNumber,
+  hideTopBack = false
 }) {
   return (
     <div className="min-h-screen bg-[#eef2f8] p-3 lg:p-5">
@@ -59,15 +60,17 @@ export default function OnboardingLayout({
           />
           <div className="px-4 pb-3 pt-4 lg:px-8 lg:pb-4 lg:pt-6">
             <div className="grid grid-cols-[1fr_auto_1fr] items-center">
-              <button
-                type="button"
-                onClick={onBack}
-                disabled={disableBack}
-                className="inline-flex w-fit items-center gap-2 text-sm font-medium text-[#4b5a88] hover:text-[#2f54eb] disabled:opacity-45"
-              >
-                <ChevronLeft className="h-4 w-4" />
-                Back
-              </button>
+              {!hideTopBack ? (
+                <button
+                  type="button"
+                  onClick={onBack}
+                  disabled={disableBack}
+                  className="inline-flex w-fit items-center gap-2 text-sm font-medium text-[#4b5a88] hover:text-[#2f54eb] disabled:opacity-45"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                  Back
+                </button>
+              ) : <div />}
 
               <img
                 src={BRAND_LOGOS.mainBlue}

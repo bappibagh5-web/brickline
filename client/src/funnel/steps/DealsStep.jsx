@@ -17,7 +17,8 @@ export default function DealsStep({
   value,
   setValue,
   canProceed,
-  onNext
+  onNext,
+  onBack
 }) {
   const content = (
     <div className="space-y-2.5">
@@ -39,14 +40,23 @@ export default function DealsStep({
         );
       })}
 
-      <button
-        type="button"
-        onClick={onNext}
-        disabled={!canProceed}
-        className="mt-1 inline-flex h-12 w-full items-center justify-center rounded-lg bg-gradient-to-r from-[#2f54eb] to-[#2145df] text-base font-semibold text-white transition-all duration-150 disabled:bg-[#cfd8ea] disabled:text-white/85"
-      >
-        Continue <ArrowRight className="ml-2 h-5 w-5" />
-      </button>
+      <div className="mt-4 flex items-center justify-between gap-3">
+        <button
+          type="button"
+          onClick={onBack}
+          className="inline-flex h-11 min-w-[88px] items-center justify-center rounded-lg border border-[#d4dbeb] bg-white px-4 text-sm font-semibold text-[#4d5d86] transition-all duration-150 hover:bg-[#f5f8ff]"
+        >
+          Back
+        </button>
+        <button
+          type="button"
+          onClick={onNext}
+          disabled={!canProceed}
+          className="inline-flex h-11 min-w-[120px] items-center justify-center rounded-lg bg-gradient-to-r from-[#2f54eb] to-[#2145df] px-5 text-sm font-semibold text-white transition-all duration-150 disabled:bg-[#cfd8ea] disabled:text-white/85"
+        >
+          Continue <ArrowRight className="ml-1.5 h-4 w-4" />
+        </button>
+      </div>
     </div>
   );
 

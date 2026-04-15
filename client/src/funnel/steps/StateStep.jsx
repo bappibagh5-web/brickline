@@ -15,6 +15,7 @@ export default function StateStep({
   setValue,
   canProceed,
   onNext,
+  onBack,
   states
 }) {
   const content = (
@@ -32,14 +33,23 @@ export default function StateStep({
         ))}
       </select>
 
-      <button
-        type="button"
-        onClick={onNext}
-        disabled={!canProceed}
-        className="inline-flex h-12 w-full items-center justify-center rounded-lg bg-gradient-to-r from-[#2f54eb] to-[#2145df] text-base font-semibold text-white transition-all duration-150 disabled:bg-[#cfd8ea] disabled:text-white/85"
-      >
-        Next
-      </button>
+      <div className="mt-4 flex items-center justify-between gap-3">
+        <button
+          type="button"
+          onClick={onBack}
+          className="inline-flex h-11 min-w-[88px] items-center justify-center rounded-lg border border-[#d4dbeb] bg-white px-4 text-sm font-semibold text-[#4d5d86] transition-all duration-150 hover:bg-[#f5f8ff]"
+        >
+          Back
+        </button>
+        <button
+          type="button"
+          onClick={onNext}
+          disabled={!canProceed}
+          className="inline-flex h-11 min-w-[110px] items-center justify-center rounded-lg bg-gradient-to-r from-[#2f54eb] to-[#2145df] px-5 text-sm font-semibold text-white transition-all duration-150 disabled:bg-[#cfd8ea] disabled:text-white/85"
+        >
+          Next
+        </button>
+      </div>
     </div>
   );
 

@@ -3,7 +3,8 @@ import StepLayout from '../StepLayout.jsx';
 export default function CheckEmailStep({
   firstName,
   email,
-  onOpenEmail
+  onOpenEmail,
+  onBack
 }) {
   const safeFirstName = String(firstName || '').trim();
   const safeEmail = String(email || '').trim();
@@ -23,13 +24,22 @@ export default function CheckEmailStep({
           <p className="max-w-[640px] text-[17px] leading-7 text-[#556287]">
             {subtext}
           </p>
-          <button
-            type="button"
-            onClick={onOpenEmail}
-            className="inline-flex h-12 min-w-[170px] items-center justify-center rounded-lg bg-gradient-to-r from-[#2f54eb] to-[#2145df] px-5 text-base font-semibold text-white transition-all duration-150 hover:brightness-105"
-          >
-            Open your email
-          </button>
+          <div className="mt-4 flex items-center justify-between gap-3">
+            <button
+              type="button"
+              onClick={onBack}
+              className="inline-flex h-11 min-w-[88px] items-center justify-center rounded-lg border border-[#d4dbeb] bg-white px-4 text-sm font-semibold text-[#4d5d86] transition-all duration-150 hover:bg-[#f5f8ff]"
+            >
+              Back
+            </button>
+            <button
+              type="button"
+              onClick={onOpenEmail}
+              className="inline-flex h-11 min-w-[170px] items-center justify-center rounded-lg bg-gradient-to-r from-[#2f54eb] to-[#2145df] px-5 text-sm font-semibold text-white transition-all duration-150 hover:brightness-105"
+            >
+              Open your email
+            </button>
+          </div>
           <p className="text-xs leading-5 text-[#7b86a6]">
             Use the secure link in your inbox to continue where you left off.
           </p>

@@ -2290,6 +2290,7 @@ export default function FunnelStepPage() {
         stepNumber={onboardingStepNumber}
         onBack={handleBack}
         disableBack={stepId === funnelInitialStepId}
+        hideTopBack={onboardingStepNumber !== 1}
       >
         {stepId === 'loanProgram' ? (
           <FinancingType
@@ -2310,6 +2311,7 @@ export default function FunnelStepPage() {
             options={step.options || []}
             value={value}
             setValue={setStepValue}
+            onBack={handleBack}
           />
         ) : null}
 
@@ -2320,6 +2322,7 @@ export default function FunnelStepPage() {
             value={value}
             setValue={setStepValue}
             states={US_STATES}
+            onBack={handleBack}
           />
         ) : null}
 
@@ -2330,6 +2333,7 @@ export default function FunnelStepPage() {
             description={onboardingSubtitle}
             value={value}
             setValue={setStepValue}
+            onBack={handleBack}
           />
         ) : null}
 
@@ -2339,6 +2343,7 @@ export default function FunnelStepPage() {
               firstName={checkEmailFirstName}
               email={checkEmailAddress}
               onOpenEmail={handleOpenEmail}
+              onBack={handleBack}
             />
           </div>
         ) : null}
@@ -2350,6 +2355,7 @@ export default function FunnelStepPage() {
             options={step.options || []}
             value={value}
             setValue={setStepValue}
+            onBack={handleBack}
           />
         ) : null}
 
@@ -2359,6 +2365,7 @@ export default function FunnelStepPage() {
             title={step.title || ''}
             value={value}
             setValue={setStepValue}
+            onBack={handleBack}
           />
         ) : null}
 
@@ -2367,6 +2374,7 @@ export default function FunnelStepPage() {
             {...sharedProps}
             title={step.title || ''}
             description={step.description || ''}
+            onBack={handleBack}
             addressField={
               <AddressAutocompleteField
                 value={value}
