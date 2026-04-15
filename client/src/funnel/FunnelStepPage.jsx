@@ -1727,6 +1727,7 @@ export default function FunnelStepPage() {
   const [submitError, setSubmitError] = useState('');
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [checkEmailSaved, setCheckEmailSaved] = useState(false);
+  const autoAdvanceTimeoutRef = useRef(null);
 
   const fetchApi = async (path, options = {}) => {
     let lastError = null;
@@ -1779,46 +1780,46 @@ export default function FunnelStepPage() {
     return step.description || '';
   })();
 
-  const canProceed = (() => {
+  const computeCanProceed = (candidateValue) => {
     if (step.type === 'leadCapture') {
-      const firstName = String(value?.first_name || '').trim();
-      const lastName = String(value?.last_name || '').trim();
-      const email = String(value?.email || '').trim();
-      const phone = String(value?.phone || '').trim();
+      const firstName = String(candidateValue?.first_name || '').trim();
+      const lastName = String(candidateValue?.last_name || '').trim();
+      const email = String(candidateValue?.email || '').trim();
+      const phone = String(candidateValue?.phone || '').trim();
       return Boolean(firstName && lastName && isValidEmail(email) && isValidUsPhone(phone));
     }
 
     if (step.type === 'name') {
-      const firstName = String(value?.first_name || '').trim();
-      const lastName = String(value?.last_name || '').trim();
+      const firstName = String(candidateValue?.first_name || '').trim();
+      const lastName = String(candidateValue?.last_name || '').trim();
       return Boolean(firstName && lastName);
     }
 
     if (step.type === 'address') {
-      return Boolean(String(value?.place_id || '').trim());
+      return Boolean(String(candidateValue?.place_id || '').trim());
     }
 
     if (step.type === 'signingDate') {
-      return validateSigningDate(value).valid;
+      return validateSigningDate(candidateValue).valid;
     }
 
     if (step.type === 'borrowerDetails') {
       const hasIdentity = Boolean(
-        String(value?.entity_name || '').trim()
-        && String(value?.first_name || '').trim()
-        && String(value?.last_name || '').trim()
+        String(candidateValue?.entity_name || '').trim()
+        && String(candidateValue?.first_name || '').trim()
+        && String(candidateValue?.last_name || '').trim()
       );
       const hasAddress = Boolean(
-        String(value?.address?.address_line_1 || '').trim()
-        && String(value?.address?.city || '').trim()
-        && String(value?.address?.state || '').trim()
-        && String(value?.address?.zip || '').trim()
+        String(candidateValue?.address?.address_line_1 || '').trim()
+        && String(candidateValue?.address?.city || '').trim()
+        && String(candidateValue?.address?.state || '').trim()
+        && String(candidateValue?.address?.zip || '').trim()
       );
       return hasIdentity && hasAddress;
     }
 
     if (step.type === 'eligibilityConfirm') {
-      return Boolean(value?.non_owner_occupied);
+      return Boolean(candidateValue?.non_owner_occupied);
     }
 
     if (step.type === 'reviewSubmit') {
@@ -1829,8 +1830,10 @@ export default function FunnelStepPage() {
       return Boolean(step.next);
     }
 
-    return Boolean(String(value || '').trim());
-  })();
+    return Boolean(String(candidateValue || '').trim());
+  };
+
+  const canProceed = computeCanProceed(value);
 
   useEffect(() => {
     let ignore = false;
@@ -2036,12 +2039,12 @@ export default function FunnelStepPage() {
     setAnswer(step.key, nextValue);
   };
 
-  const getStepPayload = () => {
+  const getStepPayload = (sourceValue = value) => {
     if (step.type === 'leadCapture') {
-      const firstName = String(value?.first_name || '').trim();
-      const lastName = String(value?.last_name || '').trim();
-      const email = String(value?.email || '').trim();
-      const phone = String(value?.phone || '').trim();
+      const firstName = String(sourceValue?.first_name || '').trim();
+      const lastName = String(sourceValue?.last_name || '').trim();
+      const email = String(sourceValue?.email || '').trim();
+      const phone = String(sourceValue?.phone || '').trim();
       return {
         first_name: firstName,
         last_name: lastName,
@@ -2058,9 +2061,9 @@ export default function FunnelStepPage() {
     }
 
     if (step.type === 'name') {
-      const firstName = String(value?.first_name || '').trim();
-      const lastName = String(value?.last_name || '').trim();
-      const suffix = String(value?.suffix || '').trim();
+      const firstName = String(sourceValue?.first_name || '').trim();
+      const lastName = String(sourceValue?.last_name || '').trim();
+      const suffix = String(sourceValue?.suffix || '').trim();
       return {
         first_name: firstName,
         last_name: lastName,
@@ -2071,13 +2074,13 @@ export default function FunnelStepPage() {
 
     if (step.type === 'address') {
       const baseAddress = normalizeAddressValue({
-        address_line_1: String(value?.address_line_1 || '').trim(),
-        address_line_2: String(value?.address_line_2 || '').trim(),
-        city: String(value?.city || '').trim(),
-        state: String(value?.state || '').trim(),
-        zip: String(value?.zip || '').trim(),
-        full_address: String(value?.full_address || '').trim(),
-        place_id: String(value?.place_id || '').trim()
+        address_line_1: String(sourceValue?.address_line_1 || '').trim(),
+        address_line_2: String(sourceValue?.address_line_2 || '').trim(),
+        city: String(sourceValue?.city || '').trim(),
+        state: String(sourceValue?.state || '').trim(),
+        zip: String(sourceValue?.zip || '').trim(),
+        full_address: String(sourceValue?.full_address || '').trim(),
+        place_id: String(sourceValue?.place_id || '').trim()
       });
 
       if (!step.addressPrefix) {
@@ -2098,20 +2101,20 @@ export default function FunnelStepPage() {
 
     if (step.type === 'borrowerDetails') {
       return {
-        entity_name: String(value?.entity_name || '').trim(),
-        first_name: String(value?.first_name || '').trim(),
-        last_name: String(value?.last_name || '').trim(),
-        dob: String(value?.dob || '').trim(),
+        entity_name: String(sourceValue?.entity_name || '').trim(),
+        first_name: String(sourceValue?.first_name || '').trim(),
+        last_name: String(sourceValue?.last_name || '').trim(),
+        dob: String(sourceValue?.dob || '').trim(),
         address: {
-          address_line_1: String(value?.address?.address_line_1 || '').trim(),
-          address_line_2: String(value?.address?.address_line_2 || '').trim(),
-          city: String(value?.address?.city || '').trim(),
-          state: String(value?.address?.state || '').trim(),
-          zip: String(value?.address?.zip || '').trim()
+          address_line_1: String(sourceValue?.address?.address_line_1 || '').trim(),
+          address_line_2: String(sourceValue?.address?.address_line_2 || '').trim(),
+          city: String(sourceValue?.address?.city || '').trim(),
+          state: String(sourceValue?.address?.state || '').trim(),
+          zip: String(sourceValue?.address?.zip || '').trim()
         },
         consents: {
-          credit_pull: Boolean(value?.consents?.credit_pull),
-          background_check: Boolean(value?.consents?.background_check)
+          credit_pull: Boolean(sourceValue?.consents?.credit_pull),
+          background_check: Boolean(sourceValue?.consents?.background_check)
         }
       };
     }
@@ -2121,15 +2124,20 @@ export default function FunnelStepPage() {
     }
 
     return {
-      [step.key]: value
+      [step.key]: sourceValue
     };
   };
 
-  const handleNext = async () => {
-    if (!canProceed) return;
+  const handleNext = async (nextValueOverride = value) => {
+    if (autoAdvanceTimeoutRef.current) {
+      clearTimeout(autoAdvanceTimeoutRef.current);
+      autoAdvanceTimeoutRef.current = null;
+    }
+
+    if (!computeCanProceed(nextValueOverride)) return;
 
     setError('');
-    const nextRoute = getNextRoute(stepId, value, answers, {
+    const nextRoute = getNextRoute(stepId, nextValueOverride, answers, {
       isAuthenticated: Boolean(user)
     });
     if (!nextRoute) return;
@@ -2143,11 +2151,11 @@ export default function FunnelStepPage() {
     void (async () => {
       try {
         const activeApplicationId = applicationId || await ensureApplicationSession();
-        const payloadData = getStepPayload();
+        const payloadData = getStepPayload(nextValueOverride);
         const shouldSaveStep = Boolean(payloadData && activeApplicationId);
 
-        if (step.type === 'leadCapture' && typeof value?.email === 'string') {
-          setStoredFunnelEmail(value.email);
+        if (step.type === 'leadCapture' && typeof nextValueOverride?.email === 'string') {
+          setStoredFunnelEmail(nextValueOverride.email);
         }
 
         if (!shouldSaveStep) return;
@@ -2179,6 +2187,22 @@ export default function FunnelStepPage() {
       }
     })();
   };
+
+  const handleAutoAdvanceSelect = (selectedValue) => {
+    setStepValue(selectedValue);
+    if (autoAdvanceTimeoutRef.current) {
+      clearTimeout(autoAdvanceTimeoutRef.current);
+    }
+    autoAdvanceTimeoutRef.current = setTimeout(() => {
+      handleNext(selectedValue);
+    }, 150);
+  };
+
+  useEffect(() => () => {
+    if (autoAdvanceTimeoutRef.current) {
+      clearTimeout(autoAdvanceTimeoutRef.current);
+    }
+  }, []);
 
   const handleOpenEmail = () => {
     window.open('https://mail.google.com', '_blank', 'noopener,noreferrer');
@@ -2300,6 +2324,7 @@ export default function FunnelStepPage() {
             options={step.options || []}
             value={value}
             setValue={setStepValue}
+            onAutoSelect={handleAutoAdvanceSelect}
           />
         ) : null}
 
@@ -2312,6 +2337,7 @@ export default function FunnelStepPage() {
             value={value}
             setValue={setStepValue}
             onBack={handleBack}
+            onAutoSelect={handleAutoAdvanceSelect}
           />
         ) : null}
 
@@ -2356,6 +2382,7 @@ export default function FunnelStepPage() {
             value={value}
             setValue={setStepValue}
             onBack={handleBack}
+            onAutoSelect={handleAutoAdvanceSelect}
           />
         ) : null}
 

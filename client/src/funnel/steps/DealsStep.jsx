@@ -18,7 +18,8 @@ export default function DealsStep({
   setValue,
   canProceed,
   onNext,
-  onBack
+  onBack,
+  onAutoSelect
 }) {
   const content = (
     <div className="space-y-2.5">
@@ -28,7 +29,10 @@ export default function DealsStep({
           <button
             key={option.value}
             type="button"
-            onClick={() => setValue(option.value)}
+            onClick={() => {
+              setValue(option.value);
+              onAutoSelect?.(option.value);
+            }}
             className={`h-12 w-full rounded-lg border px-4 text-left text-[17px] font-medium transition-all duration-150 ${
               selected
                 ? 'border-[#2f54eb] bg-[#eef3ff] text-[#2f54eb]'

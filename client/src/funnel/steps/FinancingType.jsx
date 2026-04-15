@@ -31,7 +31,8 @@ export default function FinancingType({
   value,
   setValue,
   canProceed,
-  onNext
+  onNext,
+  onAutoSelect
 }) {
   const content = (
     <div className="space-y-3">
@@ -43,7 +44,10 @@ export default function FinancingType({
             <button
               key={option.value}
               type="button"
-              onClick={() => setValue(option.value)}
+              onClick={() => {
+                setValue(option.value);
+                onAutoSelect?.(option.value);
+              }}
               className={`group h-[106px] rounded-xl border p-4 text-left transition-all duration-200 ${
                 selected
                   ? 'border-[#2f54eb] bg-[#eef3ff] shadow-[0_10px_20px_rgba(47,84,235,0.13)]'
