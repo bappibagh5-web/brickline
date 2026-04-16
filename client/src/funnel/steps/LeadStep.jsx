@@ -1,4 +1,5 @@
 import { ArrowRight, Mail, Phone, User } from 'lucide-react';
+import { useMemo, useState } from 'react';
 import StepLayout from '../StepLayout.jsx';
 
 function highlightStepAway(title) {
@@ -30,42 +31,109 @@ export default function LeadStep({
   description,
   value,
   setValue,
-  canProceed,
   onNext,
   onBack
 }) {
+  const [fieldErrors, setFieldErrors] = useState({});
+
+  const normalized = useMemo(() => {
+    const firstName = String(value?.first_name || '').trim();
+    const lastName = String(value?.last_name || '').trim();
+    const email = String(value?.email || '').trim();
+    const phone = String(value?.phone || '').trim();
+    const phoneDigits = phone.replace(/\D/g, '');
+    return { firstName, lastName, email, phone, phoneDigits };
+  }, [value]);
+
+  const validate = () => {
+    const nextErrors = {};
+    if (!normalized.firstName) nextErrors.first_name = 'First name is required.';
+    if (!normalized.lastName) nextErrors.last_name = 'Last name is required.';
+    if (!normalized.email) {
+      nextErrors.email = 'Email is required.';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized.email)) {
+      nextErrors.email = 'Enter a valid email address.';
+    }
+    if (!normalized.phone) {
+      nextErrors.phone = 'Phone number is required.';
+    } else if (normalized.phoneDigits.length !== 10) {
+      nextErrors.phone = 'Enter a valid 10-digit phone number.';
+    }
+    setFieldErrors(nextErrors);
+    return Object.keys(nextErrors).length === 0;
+  };
+
+  const clearFieldError = (fieldName) => {
+    if (!fieldErrors[fieldName]) return;
+    setFieldErrors((prev) => {
+      const next = { ...prev };
+      delete next[fieldName];
+      return next;
+    });
+  };
+
+  const handleSubmit = (event) => {
+    event.preventDefault();
+    if (!validate()) return;
+    onNext?.(value);
+  };
+
   const content = (
-    <div className="space-y-3">
+    <form className="space-y-3" onSubmit={handleSubmit} noValidate>
       <div className="grid grid-cols-1 gap-2.5 md:grid-cols-2">
-        <LeadInput
-          icon={User}
-          value={value?.first_name || ''}
-          onChange={(event) => setValue({ ...value, first_name: event.target.value })}
-          placeholder="First Name"
-        />
-        <LeadInput
-          icon={User}
-          value={value?.last_name || ''}
-          onChange={(event) => setValue({ ...value, last_name: event.target.value })}
-          placeholder="Last Name"
-        />
+        <div>
+          <LeadInput
+            icon={User}
+            value={value?.first_name || ''}
+            onChange={(event) => {
+              setValue({ ...value, first_name: event.target.value });
+              clearFieldError('first_name');
+            }}
+            placeholder="First Name"
+          />
+          {fieldErrors.first_name ? <p className="mt-1 text-xs text-[#b63d3d]">{fieldErrors.first_name}</p> : null}
+        </div>
+        <div>
+          <LeadInput
+            icon={User}
+            value={value?.last_name || ''}
+            onChange={(event) => {
+              setValue({ ...value, last_name: event.target.value });
+              clearFieldError('last_name');
+            }}
+            placeholder="Last Name"
+          />
+          {fieldErrors.last_name ? <p className="mt-1 text-xs text-[#b63d3d]">{fieldErrors.last_name}</p> : null}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-2.5 md:grid-cols-2">
-        <LeadInput
-          icon={Mail}
-          type="email"
-          value={value?.email || ''}
-          onChange={(event) => setValue({ ...value, email: event.target.value })}
-          placeholder="Email Address"
-        />
-        <LeadInput
-          icon={Phone}
-          type="tel"
-          value={value?.phone || ''}
-          onChange={(event) => setValue({ ...value, phone: event.target.value })}
-          placeholder="Phone Number"
-        />
+        <div>
+          <LeadInput
+            icon={Mail}
+            type="email"
+            value={value?.email || ''}
+            onChange={(event) => {
+              setValue({ ...value, email: event.target.value });
+              clearFieldError('email');
+            }}
+            placeholder="Email Address"
+          />
+          {fieldErrors.email ? <p className="mt-1 text-xs text-[#b63d3d]">{fieldErrors.email}</p> : null}
+        </div>
+        <div>
+          <LeadInput
+            icon={Phone}
+            type="tel"
+            value={value?.phone || ''}
+            onChange={(event) => {
+              setValue({ ...value, phone: event.target.value });
+              clearFieldError('phone');
+            }}
+            placeholder="Phone Number"
+          />
+          {fieldErrors.phone ? <p className="mt-1 text-xs text-[#b63d3d]">{fieldErrors.phone}</p> : null}
+        </div>
       </div>
 
       <div className="mt-4 flex items-center justify-between gap-3">
@@ -77,9 +145,7 @@ export default function LeadStep({
           Back
         </button>
         <button
-          type="button"
-          onClick={onNext}
-          disabled={!canProceed}
+          type="submit"
           className="inline-flex h-11 min-w-[120px] items-center justify-center rounded-lg bg-gradient-to-r from-[#2f54eb] to-[#2145df] px-5 text-sm font-semibold text-white transition-all duration-150 disabled:bg-[#cfd8ea] disabled:text-white/85"
         >
           Continue <ArrowRight className="ml-1.5 h-4 w-4" />
@@ -93,7 +159,7 @@ export default function LeadStep({
         frequency may depend on your activity. You may opt-out of texting by replying "STOP". Reply
         "HELP" for more information. Message and data rates may apply.
       </p>
-    </div>
+    </form>
   );
 
   return (
