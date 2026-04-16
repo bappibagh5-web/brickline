@@ -2209,16 +2209,21 @@ export default function FunnelStepPage() {
   };
 
   const handleSubmitForReview = async () => {
-    if (!applicationId || saving) return;
+    if (saving) return;
     setSubmitError('');
     setSubmitSuccess(false);
     setSaving(true);
 
     try {
+      const activeApplicationId = applicationId || await ensureApplicationSession();
+      if (!activeApplicationId) {
+        throw new Error('Unable to find application session. Please refresh and try again.');
+      }
+
       const selectedLoan = getStoredSelectedLoan();
       console.log('Selected Loan:', selectedLoan);
       if (selectedLoan && typeof selectedLoan === 'object') {
-        await fetchApi(`/applications/${applicationId}/save-step`, {
+        await fetchApi(`/applications/${activeApplicationId}/save-step`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'
@@ -2234,7 +2239,7 @@ export default function FunnelStepPage() {
         }).catch(() => null);
       }
 
-      const response = await fetchApi(`/applications/${applicationId}/submit`, {
+      const response = await fetchApi(`/applications/${activeApplicationId}/submit`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'

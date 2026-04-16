@@ -416,7 +416,7 @@ export default function RateCalculatorPage() {
             metrics={metrics}
             loading={loading}
             savingProduct={savingProduct}
-            disableChoose={!String(form.property_type || '').trim() || isFloridaCondo}
+            disableChoose={isFloridaCondo}
             externalErrors={resultErrors}
             onChooseProduct={handleChooseProduct}
           />
