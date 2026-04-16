@@ -34,6 +34,8 @@ const US_STATES = [
   'VA', 'WA', 'WV', 'WI', 'WY'
 ];
 
+const LAST_FUNNEL_ROUTE_KEY = 'brickline:last-funnel-route';
+
 const ONBOARDING_STEP_ORDER = {
   loanProgram: 1,
   dealsLast24: 2,
@@ -1746,10 +1748,28 @@ export default function FunnelStepPage() {
   const current = getStepByRoute(location.pathname);
 
   if (!current) {
-    return <Navigate to={funnelConfig[funnelInitialStepId].route} replace />;
+    const lastKnownRoute = sessionStorage.getItem(LAST_FUNNEL_ROUTE_KEY);
+    const fallbackRoute = lastKnownRoute || funnelConfig[funnelInitialStepId].route;
+    if (import.meta.env.DEV) {
+      console.warn('[Funnel] Unknown route detected, redirecting', {
+        pathname: location.pathname,
+        fallbackRoute
+      });
+    }
+    return <Navigate to={fallbackRoute} replace />;
   }
 
   const { stepId, step } = current;
+
+  useEffect(() => {
+    sessionStorage.setItem(LAST_FUNNEL_ROUTE_KEY, location.pathname);
+    if (import.meta.env.DEV) {
+      console.info('[Funnel] Step changed', {
+        stepId,
+        pathname: location.pathname
+      });
+    }
+  }, [location.pathname, stepId]);
   const value = getStepValue(step, answers);
   const onboardingStepNumber = ONBOARDING_STEP_ORDER[stepId] || null;
   const storedBorrower = getStoredBorrower() || {};
@@ -2197,6 +2217,12 @@ export default function FunnelStepPage() {
       handleNext(selectedValue);
     }, 150);
   };
+
+  useEffect(() => {
+    if (!autoAdvanceTimeoutRef.current) return;
+    clearTimeout(autoAdvanceTimeoutRef.current);
+    autoAdvanceTimeoutRef.current = null;
+  }, [stepId]);
 
   useEffect(() => () => {
     if (autoAdvanceTimeoutRef.current) {

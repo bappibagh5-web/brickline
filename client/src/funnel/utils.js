@@ -1,12 +1,23 @@
 import { funnelConfig } from './config.js';
 
+function normalizePath(pathname) {
+  const raw = String(pathname || '').trim();
+  if (!raw) return '/';
+  if (raw === '/') return raw;
+  return raw.replace(/\/+$/, '') || '/';
+}
+
 export const routeToStepId = Object.entries(funnelConfig).reduce((acc, [stepId, step]) => {
-  acc[step.route] = stepId;
+  const normalizedRoute = normalizePath(step.route);
+  acc[normalizedRoute] = stepId;
+  if (normalizedRoute !== step.route) {
+    acc[step.route] = stepId;
+  }
   return acc;
 }, {});
 
 export function getStepByRoute(pathname) {
-  const stepId = routeToStepId[pathname];
+  const stepId = routeToStepId[normalizePath(pathname)];
   if (!stepId) return null;
   return { stepId, step: funnelConfig[stepId] };
 }
