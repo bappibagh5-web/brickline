@@ -1864,7 +1864,14 @@ export default function FunnelStepPage() {
     }
 
     if (step.type === 'address') {
-      return Boolean(String(candidateValue?.place_id || '').trim());
+      const hasPlaceId = Boolean(String(candidateValue?.place_id || '').trim());
+      const hasManualAddress = Boolean(
+        String(candidateValue?.address_line_1 || '').trim()
+        && String(candidateValue?.city || '').trim()
+        && String(candidateValue?.state || '').trim()
+        && String(candidateValue?.zip || '').trim()
+      );
+      return hasPlaceId || hasManualAddress;
     }
 
     if (step.type === 'signingDate') {
