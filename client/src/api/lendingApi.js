@@ -73,6 +73,28 @@ export async function calculateLoan(apiBaseUrl, input) {
   return payload.data;
 }
 
+export async function calculateDscrLoan(apiBaseUrl, input) {
+  const response = await fetch(`${apiBaseUrl}/calculator/dscr-calculate`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(input)
+  });
+
+  const payload = await parseJson(response);
+
+  if (!response.ok) {
+    throw new Error(payload?.message || payload?.error || 'Failed to calculate DSCR loan metrics.');
+  }
+
+  if (!payload?.success || !payload?.data) {
+    throw new Error('Invalid DSCR calculator response.');
+  }
+
+  return payload.data;
+}
+
 export async function saveApplicationStep(apiBaseUrl, applicationId, stepKey, data) {
   const response = await fetch(`${apiBaseUrl}/applications/${applicationId}/save-step`, {
     method: 'POST',
