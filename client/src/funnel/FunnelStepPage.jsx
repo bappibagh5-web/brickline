@@ -44,13 +44,9 @@ const ONBOARDING_STEP_ORDER = {
   rentalDisqualification: 3,
   rentalPropertyState: 4,
   rentalLeadCapture: 5,
-  rentalEntityOwnership: 7,
-  rentalEntityName: 8,
-  rentalConfirmation: 10,
-  rentalPropertyAddress: 11,
-  rentalExpectedClosingDate: 12,
-  rentalBorrowerDetails: 13,
-  rentalReviewSubmit: 14,
+  rentalEntityOwnership: 6,
+  rentalEntityName: 7,
+  rateCalculator: 8,
   dealsLast24: 2,
   propertyState: 3,
   leadCapture: 4,
@@ -58,9 +54,21 @@ const ONBOARDING_STEP_ORDER = {
   proEntityQuestion: 5,
   standardEntityName: 6,
   proEntityName: 6,
-  propertyAddress: 7,
-  reviewSubmit: 9
+  propertyAddress: 7
 };
+
+const POST_CALCULATOR_STEP_IDS = new Set([
+  'eligibilityConfirm',
+  'financePropertyAddress',
+  'preferredSigningDate',
+  'borrowerDetails',
+  'reviewSubmit',
+  'rentalConfirmation',
+  'rentalPropertyAddress',
+  'rentalExpectedClosingDate',
+  'rentalBorrowerDetails',
+  'rentalReviewSubmit'
+]);
 
 const US_STATE_NAME_TO_CODE = {
   alabama: 'AL',
@@ -1810,10 +1818,14 @@ export default function FunnelStepPage() {
     || location.pathname.startsWith('/m/rental')
     || (stepId === 'accountCreationFlow' && answers?.loan_program === 'rental')
   );
-  const onboardingStepNumber = stepId === 'accountCreationFlow'
-    ? (isRentalFlow ? 6 : 4)
-    : (ONBOARDING_STEP_ORDER[stepId] || null);
-  const onboardingTotalSteps = isRentalFlow ? 14 : 9;
+  const isPostCalculatorStep = POST_CALCULATOR_STEP_IDS.has(stepId);
+  const onboardingStepNumber = isPostCalculatorStep
+    ? null
+    : (stepId === 'accountCreationFlow'
+      ? (isRentalFlow ? 6 : 4)
+      : (ONBOARDING_STEP_ORDER[stepId] || null));
+  const onboardingTotalSteps = 8;
+  const onboardingProgressLabel = isPostCalculatorStep ? 'Final details' : '';
   const storedBorrower = getStoredBorrower() || {};
   const checkEmailFirstName = String(
     answers?.first_name
@@ -2415,7 +2427,7 @@ export default function FunnelStepPage() {
     navigate(-1);
   };
 
-  if (onboardingStepNumber) {
+  if (onboardingStepNumber || onboardingProgressLabel) {
     const sharedProps = {
       canProceed,
       onNext: handleNext
@@ -2425,6 +2437,7 @@ export default function FunnelStepPage() {
       <OnboardingLayout
         stepNumber={onboardingStepNumber}
         totalSteps={onboardingTotalSteps}
+        progressLabel={onboardingProgressLabel}
         onBack={handleBack}
         disableBack={stepId === funnelInitialStepId}
         hideTopBack={onboardingStepNumber !== 1}

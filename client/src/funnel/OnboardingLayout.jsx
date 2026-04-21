@@ -49,6 +49,7 @@ export default function OnboardingLayout({
   disableBack,
   stepNumber,
   totalSteps = 9,
+  progressLabel = '',
   hideTopBack = false
 }) {
   return (
@@ -83,14 +84,22 @@ export default function OnboardingLayout({
             </div>
 
             <div className="mx-auto mt-4 mb-1 w-full max-w-[720px]">
-              <div className="inline-flex h-7 items-center rounded-full bg-[#dbe4f7] p-[2px]">
-                <span className="inline-flex h-full items-center rounded-full bg-[#2f54eb] px-4 text-xs font-semibold text-white">
-                  Step {stepNumber} of {totalSteps}
-                </span>
-                <span className="inline-flex h-full items-center px-3 text-xs font-medium text-[#6676a1]">
-                  Loan Type
-                </span>
-              </div>
+              {stepNumber ? (
+                <div className="inline-flex h-7 items-center rounded-full bg-[#dbe4f7] p-[2px]">
+                  <span className="inline-flex h-full items-center rounded-full bg-[#2f54eb] px-4 text-xs font-semibold text-white">
+                    Step {stepNumber} of {totalSteps}
+                  </span>
+                  <span className="inline-flex h-full items-center px-3 text-xs font-medium text-[#6676a1]">
+                    Loan Type
+                  </span>
+                </div>
+              ) : null}
+
+              {!stepNumber && progressLabel ? (
+                <div className="inline-flex h-7 items-center rounded-full bg-[#dbe4f7] px-4 text-xs font-medium text-[#6676a1]">
+                  {progressLabel}
+                </div>
+              ) : null}
             </div>
           </div>
 
