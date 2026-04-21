@@ -98,190 +98,49 @@ const DSCR_PRODUCTS = [
 
 const DSCR_PREPAY_OPTIONS = ['3-year', '5-year', '7-year'];
 
-const DSCR_RATE_MATRIX = {
-  '660-679': {
-    '3-year': {
-      '5/1 Adjustable': 6.875,
-      'Interest-Only 5/1 Adjustable': 7.0,
-      '7/1 Adjustable': 6.875,
-      'Interest-Only 7/1 Adjustable': 7.0,
-      '30 Year Fixed': 7.0,
-      'Interest-Only 30 Year Fixed': 7.0
-    },
-    '5-year': {
-      '5/1 Adjustable': 6.75,
-      'Interest-Only 5/1 Adjustable': 6.875,
-      '7/1 Adjustable': 6.75,
-      'Interest-Only 7/1 Adjustable': 6.875,
-      '30 Year Fixed': 6.875,
-      'Interest-Only 30 Year Fixed': 6.875
-    },
-    '7-year': {
-      '5/1 Adjustable': 6.5,
-      'Interest-Only 5/1 Adjustable': 6.625,
-      '7/1 Adjustable': 6.625,
-      'Interest-Only 7/1 Adjustable': 6.625,
-      '30 Year Fixed': 6.625,
-      'Interest-Only 30 Year Fixed': 6.625
-    }
-  },
-  '680-699': {
-    '3-year': {
-      '5/1 Adjustable': 6.875,
-      'Interest-Only 5/1 Adjustable': 6.875,
-      '7/1 Adjustable': 6.875,
-      'Interest-Only 7/1 Adjustable': 6.875,
-      '30 Year Fixed': 6.875,
-      'Interest-Only 30 Year Fixed': 7.0
-    },
-    '5-year': {
-      '5/1 Adjustable': 6.75,
-      'Interest-Only 5/1 Adjustable': 6.75,
-      '7/1 Adjustable': 6.75,
-      'Interest-Only 7/1 Adjustable': 6.75,
-      '30 Year Fixed': 6.75,
-      'Interest-Only 30 Year Fixed': 6.875
-    },
-    '7-year': {
-      '5/1 Adjustable': 6.5,
-      'Interest-Only 5/1 Adjustable': 6.5,
-      '7/1 Adjustable': 6.5,
-      'Interest-Only 7/1 Adjustable': 6.625,
-      '30 Year Fixed': 6.625,
-      'Interest-Only 30 Year Fixed': 6.625
-    }
-  },
-  '700-719': {
-    '3-year': {
-      '5/1 Adjustable': 6.625,
-      'Interest-Only 5/1 Adjustable': 6.625,
-      '7/1 Adjustable': 6.625,
-      'Interest-Only 7/1 Adjustable': 6.75,
-      '30 Year Fixed': 6.75,
-      'Interest-Only 30 Year Fixed': 6.75
-    },
-    '5-year': {
-      '5/1 Adjustable': 6.5,
-      'Interest-Only 5/1 Adjustable': 6.625,
-      '7/1 Adjustable': 6.5,
-      'Interest-Only 7/1 Adjustable': 6.625,
-      '30 Year Fixed': 6.625,
-      'Interest-Only 30 Year Fixed': 6.625
-    },
-    '7-year': {
-      '5/1 Adjustable': 6.375,
-      'Interest-Only 5/1 Adjustable': 6.375,
-      '7/1 Adjustable': 6.375,
-      'Interest-Only 7/1 Adjustable': 6.375,
-      '30 Year Fixed': 6.375,
-      'Interest-Only 30 Year Fixed': 6.5
-    }
-  },
-  '720-739': {
-    '3-year': {
-      '5/1 Adjustable': 6.5,
-      'Interest-Only 5/1 Adjustable': 6.625,
-      '7/1 Adjustable': 6.625,
-      'Interest-Only 7/1 Adjustable': 6.625,
-      '30 Year Fixed': 6.625,
-      'Interest-Only 30 Year Fixed': 6.625
-    },
-    '5-year': {
-      '5/1 Adjustable': 6.5,
-      'Interest-Only 5/1 Adjustable': 6.5,
-      '7/1 Adjustable': 6.5,
-      'Interest-Only 7/1 Adjustable': 6.5,
-      '30 Year Fixed': 6.5,
-      'Interest-Only 30 Year Fixed': 6.625
-    },
-    '7-year': {
-      '5/1 Adjustable': 6.25,
-      'Interest-Only 5/1 Adjustable': 6.25,
-      '7/1 Adjustable': 6.25,
-      'Interest-Only 7/1 Adjustable': 6.375,
-      '30 Year Fixed': 6.375,
-      'Interest-Only 30 Year Fixed': 6.375
-    }
-  },
-  '740-759': {
-    '3-year': {
-      '5/1 Adjustable': 6.5,
-      'Interest-Only 5/1 Adjustable': 6.625,
-      '7/1 Adjustable': 6.625,
-      'Interest-Only 7/1 Adjustable': 6.625,
-      '30 Year Fixed': 6.625,
-      'Interest-Only 30 Year Fixed': 6.625
-    },
-    '5-year': {
-      '5/1 Adjustable': 6.5,
-      'Interest-Only 5/1 Adjustable': 6.5,
-      '7/1 Adjustable': 6.5,
-      'Interest-Only 7/1 Adjustable': 6.5,
-      '30 Year Fixed': 6.5,
-      'Interest-Only 30 Year Fixed': 6.625
-    },
-    '7-year': {
-      '5/1 Adjustable': 6.25,
-      'Interest-Only 5/1 Adjustable': 6.25,
-      '7/1 Adjustable': 6.25,
-      'Interest-Only 7/1 Adjustable': 6.375,
-      '30 Year Fixed': 6.375,
-      'Interest-Only 30 Year Fixed': 6.375
-    }
-  },
-  '760-779': {
-    '3-year': {
-      '5/1 Adjustable': 6.5,
-      'Interest-Only 5/1 Adjustable': 6.625,
-      '7/1 Adjustable': 6.5,
-      'Interest-Only 7/1 Adjustable': 6.625,
-      '30 Year Fixed': 6.625,
-      'Interest-Only 30 Year Fixed': 6.625
-    },
-    '5-year': {
-      '5/1 Adjustable': 6.375,
-      'Interest-Only 5/1 Adjustable': 6.5,
-      '7/1 Adjustable': 6.5,
-      'Interest-Only 7/1 Adjustable': 6.5,
-      '30 Year Fixed': 6.5,
-      'Interest-Only 30 Year Fixed': 6.5
-    },
-    '7-year': {
-      '5/1 Adjustable': 6.25,
-      'Interest-Only 5/1 Adjustable': 6.25,
-      '7/1 Adjustable': 6.25,
-      'Interest-Only 7/1 Adjustable': 6.25,
-      '30 Year Fixed': 6.25,
-      'Interest-Only 30 Year Fixed': 6.375
-    }
-  },
-  'Over 780': {
-    '3-year': {
-      '5/1 Adjustable': 6.5,
-      'Interest-Only 5/1 Adjustable': 6.625,
-      '7/1 Adjustable': 6.5,
-      'Interest-Only 7/1 Adjustable': 6.625,
-      '30 Year Fixed': 6.625,
-      'Interest-Only 30 Year Fixed': 6.625
-    },
-    '5-year': {
-      '5/1 Adjustable': 6.375,
-      'Interest-Only 5/1 Adjustable': 6.5,
-      '7/1 Adjustable': 6.5,
-      'Interest-Only 7/1 Adjustable': 6.5,
-      '30 Year Fixed': 6.5,
-      'Interest-Only 30 Year Fixed': 6.5
-    },
-    '7-year': {
-      '5/1 Adjustable': 6.25,
-      'Interest-Only 5/1 Adjustable': 6.25,
-      '7/1 Adjustable': 6.25,
-      'Interest-Only 7/1 Adjustable': 6.25,
-      '30 Year Fixed': 6.25,
-      'Interest-Only 30 Year Fixed': 6.375
-    }
-  }
+const DSCR_PRODUCT_SPREADS = {
+  '5/1 Adjustable': 0,
+  'Interest-Only 5/1 Adjustable': 0.125,
+  '7/1 Adjustable': 0,
+  'Interest-Only 7/1 Adjustable': 0.125,
+  '30 Year Fixed': 0.125,
+  'Interest-Only 30 Year Fixed': 0.25
 };
+
+const DSCR_ANCHOR_BASE_RATES = {
+  '660-699': { '3-year': 6.875, '5-year': 6.75, '7-year': 6.5 },
+  '700-719': { '3-year': 6.625, '5-year': 6.5, '7-year': 6.375 },
+  '720-759': { '3-year': 6.5, '5-year': 6.5, '7-year': 6.25 },
+  '760+': { '3-year': 6.5, '5-year': 6.375, '7-year': 6.25 }
+};
+
+const DSCR_UI_BUCKET_TO_ANCHOR_BUCKET = {
+  '660-679': '660-699',
+  '680-699': '660-699',
+  '700-719': '700-719',
+  '720-739': '720-759',
+  '740-759': '720-759',
+  '760-779': '760+',
+  'Over 780': '760+'
+};
+
+function buildDscrRateMatrix() {
+  const matrix = {};
+  Object.entries(DSCR_UI_BUCKET_TO_ANCHOR_BUCKET).forEach(([uiBucket, anchorBucket]) => {
+    const anchorByPenalty = DSCR_ANCHOR_BASE_RATES[anchorBucket];
+    matrix[uiBucket] = {};
+    DSCR_PREPAY_OPTIONS.forEach((penalty) => {
+      const anchorRate = toNumber(anchorByPenalty?.[penalty], 0);
+      matrix[uiBucket][penalty] = {};
+      DSCR_PRODUCTS.forEach((product) => {
+        matrix[uiBucket][penalty][product.key] = Number((anchorRate + toNumber(DSCR_PRODUCT_SPREADS[product.key], 0)).toFixed(3));
+      });
+    });
+  });
+  return matrix;
+}
+
+const DSCR_RATE_MATRIX = buildDscrRateMatrix();
 
 function toNumber(value, fallback = 0) {
   const numeric = Number(value);
