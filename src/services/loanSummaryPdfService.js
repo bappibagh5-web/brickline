@@ -1,5 +1,5 @@
 const PDFDocument = require('pdfkit');
-const { calculateLoanMetrics } = require('./calculatorService');
+const { calculateLoanMetrics, calculateDscrMetrics } = require('./calculatorService');
 
 function toNumber(value, fallback = 0) {
   const numeric = Number(value);
@@ -135,6 +135,120 @@ function buildMetrics(data) {
   return merged;
 }
 
+function isDscrApplication(data) {
+  const calculatorInputs = data.calculator_inputs || {};
+  const loanProgram = String(data.loan_program || '').toLowerCase();
+  return loanProgram === 'rental'
+    || loanProgram === 'dscr'
+    || calculatorInputs.fico_bucket !== undefined
+    || calculatorInputs.prepayment_penalty !== undefined
+    || data.fico_bucket !== undefined
+    || data.prepayment_penalty !== undefined;
+}
+
+function buildDscrMetrics(data) {
+  const savedMetrics = data.calculator_results || {};
+  const calculatorInputs = data.calculator_inputs || {};
+  const selectedProductCandidates = [
+    data.selected_loan_product,
+    data.selectedLoan,
+    data.submission_snapshot?.selected_loan_product,
+    data.submission_snapshot?.selectedLoan,
+    data.submission_snapshot?.calculator?.selected_loan_product
+  ].filter((item) => item && typeof item === 'object');
+  const selectedProduct = selectedProductCandidates[0] || {};
+
+  const normalizedInputs = {
+    property_state: data.property_state || calculatorInputs.property_state || 'FL',
+    property_type: data.property_type || calculatorInputs.property_type || 'Single Family',
+    fico_bucket: data.fico_bucket || calculatorInputs.fico_bucket || '760-779',
+    prepayment_penalty: data.prepayment_penalty || calculatorInputs.prepayment_penalty || '3-year',
+    refinance: data.refinance || calculatorInputs.refinance || 'no',
+    loan_amount: toNumber(
+      data.loan_amount
+      ?? calculatorInputs.loan_amount
+      ?? selectedProduct.total_loan
+      ?? 0,
+      0
+    ),
+    purchase_price: toNumber(
+      data.purchase_price
+      ?? calculatorInputs.purchase_price
+      ?? 0,
+      0
+    ),
+    estimated_property_value: toNumber(
+      data.estimated_property_value
+      ?? calculatorInputs.estimated_property_value
+      ?? 0,
+      0
+    ),
+    remaining_mortgage: toNumber(
+      data.remaining_mortgage
+      ?? calculatorInputs.remaining_mortgage
+      ?? 0,
+      0
+    ),
+    monthly_rent: toNumber(data.monthly_rent ?? calculatorInputs.monthly_rent ?? 0, 0),
+    annual_insurance: toNumber(data.annual_insurance ?? calculatorInputs.annual_insurance ?? 0, 0),
+    annual_taxes: toNumber(data.annual_taxes ?? calculatorInputs.annual_taxes ?? 0, 0),
+    monthly_hoa: toNumber(data.monthly_hoa ?? calculatorInputs.monthly_hoa ?? 0, 0)
+  };
+
+  const calculated = calculateDscrMetrics(normalizedInputs);
+  const merged = {
+    ...calculated,
+    ...savedMetrics,
+    loan_amount: toNumber(savedMetrics.loan_amount, toNumber(calculated.loan_amount, normalizedInputs.loan_amount)),
+    purchase_price: toNumber(savedMetrics.purchase_price, toNumber(calculated.purchase_price, normalizedInputs.purchase_price)),
+    estimated_property_value: toNumber(savedMetrics.estimated_property_value, toNumber(calculated.estimated_property_value, normalizedInputs.estimated_property_value)),
+    remaining_mortgage: toNumber(savedMetrics.remaining_mortgage, toNumber(calculated.remaining_mortgage, normalizedInputs.remaining_mortgage)),
+    prepayment_penalty: savedMetrics.prepayment_penalty || calculated.prepayment_penalty || normalizedInputs.prepayment_penalty,
+    selected_product: selectedProduct
+  };
+
+  const selectedTerm = String(
+    selectedProduct.term
+    ?? selectedProduct.rate_type
+    ?? data.selected_term
+    ?? ''
+  ).trim();
+  const loanProducts = Array.isArray(merged.loan_products) ? merged.loan_products : [];
+  const matchedProduct = loanProducts.find((item) => String(item?.term || '').trim() === selectedTerm)
+    || loanProducts[0]
+    || {};
+
+  merged.selected_product = {
+    ...matchedProduct,
+    ...selectedProduct,
+    term: selectedTerm || String(matchedProduct.term || ''),
+    monthly_payment: toNumber(
+      selectedProduct.monthly_payment
+      ?? selectedProduct.monthlyPayment
+      ?? matchedProduct.monthly_payment
+      ?? matchedProduct.monthlyPayment
+      ?? 0,
+      0
+    ),
+    rate: toNumber(
+      selectedProduct.rate
+      ?? selectedProduct.interest_rate
+      ?? selectedProduct.annual_interest_rate
+      ?? matchedProduct.rate
+      ?? 0,
+      0
+    ),
+    dscr: toNumber(
+      selectedProduct.dscr
+      ?? matchedProduct.dscr
+      ?? merged.dscr,
+      0
+    )
+  };
+
+  return merged;
+}
+
 function drawBrandHeader(doc, width, yStart) {
   const blue = '#2f54eb';
   const dark = '#0f2a85';
@@ -199,17 +313,28 @@ function sectionDivider(doc, y, width) {
 
 async function generateLoanSummaryPdf(application) {
   const data = application?.application_data || {};
-  const metrics = buildMetrics(data);
+  const dscrMode = isDscrApplication(data);
+  const metrics = dscrMode ? buildDscrMetrics(data) : buildMetrics(data);
   const selectedProduct = metrics.selected_product || {};
 
-  const purchasePrice = toNumber(data.purchase_price, 60000);
-  const downPayment = Math.max(purchasePrice - metrics.purchase_loan, 0);
-  const originationFee = metrics.purchase_loan * 0.02;
+  const purchasePrice = dscrMode
+    ? toNumber(metrics.purchase_price, toNumber(data.purchase_price, 0))
+    : toNumber(data.purchase_price, 60000);
+  const primaryLoanAmount = dscrMode
+    ? toNumber(metrics.loan_amount, 0)
+    : toNumber(metrics.purchase_loan, 0);
+  const totalLoanAmount = dscrMode
+    ? (primaryLoanAmount + toNumber(data.rehab_cost ?? data.rehab_budget, 0))
+    : toNumber(metrics.total_loan, 0);
+  const downPayment = Math.max(purchasePrice - primaryLoanAmount, 0);
+  const originationFee = primaryLoanAmount * 0.02;
   const serviceFee = 1295;
-  const proRatedInterest = toNumber(selectedProduct.monthly_payment, 0) * 0.12;
+  const proRatedInterest = dscrMode ? 0 : (toNumber(selectedProduct.monthly_payment, 0) * 0.12);
   const cashToClose = downPayment + originationFee + serviceFee + proRatedInterest;
   const downPaymentPct = purchasePrice > 0 ? (downPayment / purchasePrice) * 100 : 0;
-  const hasRehabAmount = toNumber(metrics.rehab_loan, 0) > 0;
+  const hasRehabAmount = dscrMode
+    ? toNumber(data.rehab_cost ?? data.rehab_budget ?? 0, 0) > 0
+    : toNumber(metrics.rehab_loan, 0) > 0;
 
   const doc = new PDFDocument({ size: 'A4', margin: 0 });
   const chunks = [];
@@ -252,14 +377,14 @@ async function generateLoanSummaryPdf(application) {
   writePairRow(doc, 'Entity Name', getEntityName(data), 62, pageWidth - 230, y, { muted: true });
   y += 24;
 
-  writePairRow(doc, 'Total Loan Amount', formatCurrency(metrics.total_loan), 62, pageWidth - 230, y, { boldValue: true, valueSize: 12, labelSize: 12 });
+  writePairRow(doc, 'Total Loan Amount', formatCurrency(totalLoanAmount), 62, pageWidth - 230, y, { boldValue: true, valueSize: 12, labelSize: 12 });
   y += 26;
-  writePairRow(doc, 'Loan Amount', formatCurrency(metrics.purchase_loan), 82, pageWidth - 230, y, { muted: true });
+  writePairRow(doc, 'Loan Amount', formatCurrency(primaryLoanAmount), 82, pageWidth - 230, y, { muted: true });
   y += 22;
-  writePairRow(doc, 'Purchase Loan Amount', formatCurrency(metrics.purchase_loan), 82, pageWidth - 230, y, { muted: true });
+  writePairRow(doc, 'Purchase Loan Amount', formatCurrency(primaryLoanAmount), 82, pageWidth - 230, y, { muted: true });
   y += 22;
   if (hasRehabAmount) {
-    writePairRow(doc, 'Rehab Amount', formatCurrency(metrics.rehab_loan), 82, pageWidth - 230, y, { muted: true });
+    writePairRow(doc, 'Rehab Amount', formatCurrency(toNumber(metrics.rehab_loan ?? data.rehab_budget ?? data.rehab_cost, 0)), 82, pageWidth - 230, y, { muted: true });
     y += 22;
   }
   y += 2;
@@ -280,8 +405,14 @@ async function generateLoanSummaryPdf(application) {
   y += 21;
   writePairRow(doc, 'Service Fee', formatCurrency(serviceFee), 82, pageWidth - 230, y, { muted: true });
   y += 21;
-  writePairRow(doc, 'Pro-rated Interest', formatCurrency(proRatedInterest), 82, pageWidth - 230, y, { muted: true });
-  y += 22;
+  if (dscrMode) {
+    writePairRow(doc, 'Pro-rated Interest', '$0', 82, pageWidth - 230, y, { muted: true });
+    y += 21;
+  } else {
+    writePairRow(doc, 'Pro-rated Interest', formatCurrency(proRatedInterest), 82, pageWidth - 230, y, { muted: true });
+    y += 21;
+  }
+  y += 1;
 
   sectionDivider(doc, y, pageWidth);
   y += 20;
@@ -293,7 +424,19 @@ async function generateLoanSummaryPdf(application) {
     .text('Additional Details', 62, y);
   y += 22;
 
-  const detailRows = [
+  const detailRows = dscrMode ? [
+    ['Loan Term', String(selectedProduct.term || 'N/A')],
+    ['Loan Type', 'Rental (DSCR)'],
+    ['Interest-Only Period', String(selectedProduct.term || 'N/A')],
+    ['Prepayment Penalty', String(metrics.prepayment_penalty || data.prepayment_penalty || 'N/A')],
+    ['Preferred Signing Date', formatDate(data.preferred_signing_date)],
+    ['Purpose', 'Rental'],
+    ['Property Type', data.property_type || data.calculator_inputs?.property_type || 'N/A'],
+    ['Purchase Price', formatCurrency(purchasePrice)],
+    ['As-is Value', formatCurrency(toNumber(metrics.estimated_property_value, purchasePrice))],
+    ['Loan-to-Value', formatPercent(toNumber(metrics.ltv, 0))],
+    ['Estimated DSCR', toNumber(selectedProduct.dscr, 0) > 0 ? toNumber(selectedProduct.dscr, 0).toFixed(2) : 'N/A']
+  ] : [
     ['Loan Term', `${selectedProduct.term || 12} months`],
     ['Loan Type', 'Bridge / Hard Money'],
     ['Interest-Only Period', `${selectedProduct.term || 12} months`],
